@@ -168,7 +168,7 @@ def on_connect(client, userdata, flags, reason_code, properties):
 
 def on_message(client, userdata, msg):
     payload = msg.payload.decode()
-    update_display(payload)
+    root.after(0, update_display, payload)
 
 mqtt_client.on_connect = on_connect
 mqtt_client.on_message = on_message
