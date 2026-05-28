@@ -241,19 +241,33 @@ def main():
         add_communication_log("MQTT", MQTT_BROKER, f"Connect failed: {str(e)}", "ERROR")
     
     # Modbus connect
+    MODBUS_RECONNECT_INTERVAL = 30
+    last_modbus_attempt = 0
     client_modbus = ModbusTcpClient(ADAM_IP, port=MODBUS_PORT)
     if not client_modbus.connect():
         add_communication_log("MODBUS", ADAM_IP, "ADAM-6250 connect failed", "ERROR")
         client_modbus = None
+        last_modbus_attempt = time.time()
     else:
         add_communication_log("MODBUS", ADAM_IP, "ADAM-6250 connected", "SUCCESS")
 
     # Start web server
     threading.Thread(target=start_web_server, daemon=True).start()
-    
+
     # Main loop
     try:
         while True:
+            # Reconnect if disconnected
+            if client_modbus is None:
+                if time.time() - last_modbus_attempt >= MODBUS_RECONNECT_INTERVAL:
+                    last_modbus_attempt = time.time()
+                    client_modbus = ModbusTcpClient(ADAM_IP, port=MODBUS_PORT)
+                    if not client_modbus.connect():
+                        add_communication_log("MODBUS", ADAM_IP, "ADAM-6250 reconnect failed", "ERROR")
+                        client_modbus = None
+                    else:
+                        add_communication_log("MODBUS", ADAM_IP, "ADAM-6250 reconnected", "SUCCESS")
+
             if client_modbus:
                 try:
                     rr = client_modbus.read_discrete_inputs(address=0, count=8)
@@ -272,6 +286,12 @@ def main():
                     add_communication_log("MODBUS", ADAM_IP, f"Error: {str(e)}", "ERROR")
                     di_bits = [0]*8
                     signal_str = "OFF"
+                    try:
+                        client_modbus.close()
+                    except Exception:
+                        pass
+                    client_modbus = None
+                    last_modbus_attempt = time.time()
             else:
                 di_bits = [0]*8
                 signal_str = "OFF"
