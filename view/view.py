@@ -12,9 +12,10 @@ from ctypes import cast, POINTER
 from comtypes import CLSCTX_ALL
 from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 import time
+from datetime import datetime
 
 # Logging
-LOG_DIR = Path("C:/sw/logs")
+LOG_DIR = Path("C:/sw/logs") / datetime.now().strftime("%Y-%m-%d")
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 logging.basicConfig(
