@@ -15,7 +15,7 @@ import base64
 from pathlib import Path
 
 # Logging
-LOG_DIR = Path("C:/sw/logs")
+LOG_DIR = Path("C:/sw/logs") / datetime.now().strftime("%Y-%m-%d")
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 logging.basicConfig(
