@@ -117,7 +117,7 @@ def _audio_worker():
                         pass
             except Exception:
                 pass
-            logging.info(f"Audio mute: {state}")
+
 
     except Exception as e:
         logging.warning(f"Audio init failed: {e}")
