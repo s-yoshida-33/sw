@@ -64,53 +64,53 @@ current_image = None
 _audio_queue = queue.Queue()
 
 def _audio_worker():
+    volumes = []  # COM objects must stay alive within this thread
     try:
         pythoncom.CoInitialize()
 
-        def get_all_volumes():
-            volumes = []
-            try:
-                from comtypes.client import CreateObject
-                from pycaw.api.mmdeviceapi import IMMDeviceEnumerator
-                from pycaw.constants import CLSID_MMDeviceEnumerator
-                enumerator = CreateObject(
-                    CLSID_MMDeviceEnumerator, interface=IMMDeviceEnumerator
-                )
-                # eRender=0, DEVICE_STATE_ACTIVE=1
-                collection = enumerator.EnumAudioEndpoints(0, 1)
-                for i in range(collection.GetCount()):
-                    try:
-                        iface = collection.Item(i).Activate(
-                            IAudioEndpointVolume._iid_, CLSCTX_ALL, None
-                        )
-                        volumes.append(cast(iface, POINTER(IAudioEndpointVolume)))
-                    except Exception:
-                        pass
-            except Exception:
-                # fallback: default endpoint only
+        try:
+            from comtypes.client import CreateObject
+            from pycaw.api.mmdeviceapi import IMMDeviceEnumerator
+            from pycaw.constants import CLSID_MMDeviceEnumerator
+            enumerator = CreateObject(
+                CLSID_MMDeviceEnumerator, interface=IMMDeviceEnumerator
+            )
+            collection = enumerator.EnumAudioEndpoints(0, 1)  # eRender, ACTIVE
+            for i in range(collection.GetCount()):
                 try:
-                    dev = getattr(AudioUtilities.GetSpeakers(), '_dev',
-                                  AudioUtilities.GetSpeakers())
-                    iface = dev.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+                    iface = collection.Item(i).Activate(
+                        IAudioEndpointVolume._iid_, CLSCTX_ALL, None
+                    )
                     volumes.append(cast(iface, POINTER(IAudioEndpointVolume)))
                 except Exception:
                     pass
-            return volumes
+        except Exception:
+            # fallback: default endpoint only
+            try:
+                dev = getattr(AudioUtilities.GetSpeakers(), '_dev',
+                              AudioUtilities.GetSpeakers())
+                iface = dev.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+                volumes.append(cast(iface, POINTER(IAudioEndpointVolume)))
+            except Exception:
+                pass
 
-        logging.info(f"Audio initialized ({len(get_all_volumes())} device(s))")
+        logging.info(f"Audio initialized ({len(volumes)} device(s))")
+
         while True:
             state = _audio_queue.get()
             if state is None:
                 break
-            for volume in get_all_volumes():
+            for volume in volumes:
                 try:
                     volume.SetMute(1 if state else 0, None)
                 except Exception:
                     pass
             logging.info(f"Audio mute: {state}")
+
     except Exception as e:
         logging.warning(f"Audio init failed: {e}")
     finally:
+        volumes.clear()  # release COM objects within this thread before CoUninitialize
         try:
             pythoncom.CoUninitialize()
         except Exception:
