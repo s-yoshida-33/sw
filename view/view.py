@@ -28,6 +28,7 @@ logging.basicConfig(
         logging.FileHandler(LOG_DIR / "view.log", encoding="utf-8")
     ]
 )
+logging.getLogger('comtypes').setLevel(logging.WARNING)
 
 # Default settings
 IMAGE_BASE_PATH = Path("C:/sw/images")
@@ -84,7 +85,6 @@ def _audio_worker():
                         IAudioEndpointVolume._iid_, CLSCTX_ALL, None
                     )
                     volumes.append(cast(iface, POINTER(IAudioEndpointVolume)))
-                    logging.info(f"Audio endpoint {i}: {device.GetId()}")
                 except Exception:
                     pass
         except Exception:
