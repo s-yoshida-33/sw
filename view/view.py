@@ -103,12 +103,16 @@ def _audio_worker():
             state = _audio_queue.get()
             if state is None:
                 break
-            for volume in volumes:
+            mute_val = 1 if state else 0
+            results = []
+            for i, volume in enumerate(volumes):
                 try:
-                    volume.SetMute(1 if state else 0, None)
-                except Exception:
-                    pass
-            logging.info(f"Audio mute: {state}")
+                    volume.SetMute(mute_val, None)
+                    actual = volume.GetMute()
+                    results.append(f"ep{i}={actual}")
+                except Exception as e:
+                    results.append(f"ep{i}=ERR({e})")
+            logging.info(f"Audio mute: {state} -> {', '.join(results)}")
 
     except Exception as e:
         logging.warning(f"Audio init failed: {e}")
