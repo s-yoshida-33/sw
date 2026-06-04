@@ -1,5 +1,4 @@
-pymodbus
-paho-mqtt
+python-osc
 pywin32
 pillow
 pycaw

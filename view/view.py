@@ -1,7 +1,6 @@
-# view.py v2.3
+# view.py v3.0
 
 import tkinter as tk
-import paho.mqtt.client as mqtt
 from PIL import Image, ImageTk
 from pathlib import Path
 import logging
@@ -11,8 +10,10 @@ import pythoncom
 from ctypes import cast, POINTER
 from comtypes import CLSCTX_ALL
 from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
-import time
+import threading
 from datetime import datetime
+from pythonosc.dispatcher import Dispatcher
+from pythonosc.osc_server import ThreadingOSCUDPServer
 
 # Logging
 LOG_DIR = Path("C:/sw/logs") / datetime.now().strftime("%Y-%m-%d")
@@ -29,14 +30,11 @@ logging.basicConfig(
 
 # Default settings
 IMAGE_BASE_PATH = Path("C:/sw/images")
-MQTT_BROKER = "192.168.11.106"
-MQTT_PORT = 1883
-MQTT_TOPIC = "adam6250/di"
+OSC_PORT = 9000
 
 # Config file
 config_file = Path("C:/sw/config/config.txt")
 
-# Load config
 if config_file.exists():
     with config_file.open("r", encoding="utf-8") as f:
         for line in f:
@@ -46,13 +44,11 @@ if config_file.exists():
             key, value = line.split("=", 1)
             key = key.strip()
             value = value.strip()
-            if key == "MQTT_BROKER": MQTT_BROKER = value
-            elif key == "MQTT_PORT": MQTT_PORT = int(value)
-            elif key == "MQTT_TOPIC": MQTT_TOPIC = value
+            if key == "OSC_PORT": OSC_PORT = int(value)
 
 # Tkinter init
 root = tk.Tk()
-root.title("ADAM Display")
+root.title("DI Display")
 root.configure(bg="black")
 root.attributes("-fullscreen", True)
 root.attributes("-topmost", True)
@@ -61,8 +57,6 @@ image_label = tk.Label(root, bg="black")
 image_label.pack(fill=tk.BOTH, expand=True)
 
 # State
-current_signal_str = "OFF"
-current_di_bits = [0]*8
 current_image = None
 volume_interface = None
 
@@ -91,10 +85,10 @@ def close_audio():
         pass
 
 # Load image
-def load_image(di_index):
+def load_image(channel):
     global current_image
     for ext in [".png", ".jpg"]:
-        image_path = IMAGE_BASE_PATH / f"DI_View_{di_index}{ext}"
+        image_path = IMAGE_BASE_PATH / f"DI_View_{channel}{ext}"
         if image_path.exists():
             try:
                 img = Image.open(image_path)
@@ -109,84 +103,41 @@ def load_image(di_index):
             except Exception as e:
                 logging.error(f"Image load error: {e}")
                 return False
-    # No image
-    image_label.configure(
-        image='',
-        text=f"No Image",
-        font=("Arial", 36),
-        fg="white"
-    )
+    image_label.configure(image='', text="No Image", font=("Arial", 36), fg="white")
     return False
 
-# Update display
-def update_display(payload):
-    global current_signal_str, current_di_bits
-    payload = payload.strip()
-    # Unified format: OFF / ON [DI-n]
-    signal_str = "OFF"
-    di_bits = [0]*8
-    for i in range(8):
-        if payload == str(i) or payload.upper() == f"ON [DI-{i}]":
-            signal_str = f"ON [DI-{i}]"
-            di_bits[i] = 1
-            break
-    if signal_str != current_signal_str:
-        logging.info(f"Signal changed: {current_signal_str} → {signal_str}")
-        current_signal_str = signal_str
-        current_di_bits[:] = di_bits
-        if signal_str == "OFF":
-            root.withdraw()
-            set_mute(False)
+# Update display (runs on main thread via root.after)
+def update_display(channel, state):
+    if state == 1:
+        logging.info(f"Signal ON: DI{channel}")
+        if load_image(channel):
+            root.deiconify()
+            root.lift()
+            root.attributes("-topmost", True)
+            set_mute(True)
         else:
-            di_index = di_bits.index(1)
-            if load_image(di_index):
-                root.deiconify()
-                root.lift()
-                root.attributes("-topmost", True)
-                set_mute(True)
-            else:
-                root.deiconify()
+            root.deiconify()
+    else:
+        logging.info(f"Signal OFF: DI{channel}")
+        root.withdraw()
+        set_mute(False)
+
+# OSC handler (runs on OSC thread)
+def di_handler(address, *args):
+    try:
+        channel = int(address.split('/')[-1])
+        state = int(args[0]) if args else 1
+        root.after(0, update_display, channel, state)
+    except Exception as e:
+        logging.error(f"OSC parse error: address={address} args={args} - {e}")
 
 # Safe quit
 def safe_quit():
     try:
-        mqtt_client.loop_stop()
-        mqtt_client.disconnect()
         close_audio()
         root.quit()
     except:
         pass
-
-# MQTT
-mqtt_client = mqtt.Client(protocol=mqtt.MQTTv5)
-
-def on_connect(client, userdata, flags, reason_code, properties):
-    if reason_code == 0:
-        logging.info("MQTT connected")
-        client.subscribe(MQTT_TOPIC)
-    else:
-        logging.error(f"MQTT connect failed: rc={reason_code}")
-
-def on_message(client, userdata, msg):
-    payload = msg.payload.decode()
-    root.after(0, update_display, payload)
-
-mqtt_client.on_connect = on_connect
-mqtt_client.on_message = on_message
-
-def connect_mqtt():
-    global mqtt_client
-    connected = False
-    while not connected:
-        try:
-            mqtt_client.connect(MQTT_BROKER, MQTT_PORT)
-            mqtt_client.loop_start()
-            connected = True
-            logging.info(f"MQTT connected: {MQTT_BROKER}:{MQTT_PORT}, topic={MQTT_TOPIC}")
-            mqtt_client.subscribe(MQTT_TOPIC)
-        except Exception as e:
-            logging.error(f"MQTT error: {e}, retry in 5 sec")
-            time.sleep(5)
 
 # Check images
 def check_images():
@@ -196,18 +147,26 @@ def check_images():
     images = list(IMAGE_BASE_PATH.glob("DI_View_*.png")) + list(IMAGE_BASE_PATH.glob("DI_View_*.jpg"))
     logging.info(f"Detected image files: {len(images)}")
 
-# Main process
+# Start OSC server
+def start_osc_server():
+    dispatcher = Dispatcher()
+    dispatcher.map("/di/*", di_handler)
+    server = ThreadingOSCUDPServer(("0.0.0.0", OSC_PORT), dispatcher)
+    logging.info(f"OSC server listening on UDP port {OSC_PORT}")
+    server.serve_forever()
+
+# Main
 if __name__ == "__main__":
     print("\n" + "="*50)
-    print(" ADAM-6250 Display System")
+    print(" DI Display System (OSC/UDP)")
     print("="*50)
-    print(f" Images: {IMAGE_BASE_PATH}")
-    print(f" MQTT: {MQTT_BROKER}:{MQTT_PORT}, topic={MQTT_TOPIC}")
+    print(f" Images : {IMAGE_BASE_PATH}")
+    print(f" OSC Port: {OSC_PORT}")
     print("="*50 + "\n")
 
     init_audio()
     check_images()
-    connect_mqtt()
+    threading.Thread(target=start_osc_server, daemon=True).start()
 
     try:
         root.mainloop()
