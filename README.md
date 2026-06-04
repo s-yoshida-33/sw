@@ -37,11 +37,11 @@ sw\
 │
 ├─ installer\
 │  ├─ ChromeSetup.exe           ← Chrome インストーラー
-│  └─ python-3.10.6-amd64.exe  ← Python 3.10 Windows 64bit インストーラー
+│  └─ python-3.10.6-amd64.exe   ← Python 3.10 Windows 64bit インストーラー
 │
 ├─ logs\
-│  └─ YYYY-MM-DD\              ← 日付ごとにフォルダが作成される
-│     └─ view.log              ← 表示ログ
+│  └─ YYYY-MM-DD\               ← 日付ごとにフォルダが作成される
+│     └─ view.log               ← 表示ログ
 │
 ├─ view\
 │  └─ view.py                   ← OSC/UDP 受信 & Tkinter 画面制御
