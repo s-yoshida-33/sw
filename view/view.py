@@ -67,7 +67,8 @@ def _audio_worker():
     try:
         pythoncom.CoInitialize()
         devices = AudioUtilities.GetSpeakers()
-        interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+        dev = getattr(devices, '_dev', devices)
+        interface = dev.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
         volume = cast(interface, POINTER(IAudioEndpointVolume))
         logging.info("Audio initialized")
         while True:
