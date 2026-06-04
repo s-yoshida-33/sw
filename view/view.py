@@ -104,26 +104,20 @@ def _audio_worker():
             if state is None:
                 break
             mute_val = 1 if state else 0
-            results = []
-            for i, volume in enumerate(volumes):
+            for volume in volumes:
                 try:
                     volume.SetMute(mute_val, None)
-                    actual = volume.GetMute()
-                    results.append(f"ep{i}={actual}")
-                except Exception as e:
-                    results.append(f"ep{i}=ERR({e})")
-            # Session-level mute (catches shared-mode apps regardless of endpoint)
-            session_count = 0
+                except Exception:
+                    pass
             try:
                 for session in AudioUtilities.GetAllSessions():
                     try:
                         session.SimpleAudioVolume.SetMute(mute_val, None)
-                        session_count += 1
                     except Exception:
                         pass
             except Exception:
                 pass
-            logging.info(f"Audio mute: {state} -> {', '.join(results)}, sessions={session_count}")
+            logging.info(f"Audio mute: {state}")
 
     except Exception as e:
         logging.warning(f"Audio init failed: {e}")
