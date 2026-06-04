@@ -60,6 +60,8 @@ image_label.pack(fill=tk.BOTH, expand=True)
 
 # State
 current_image = None
+active_channel = None
+preloaded_images = {}  # channel -> ImageTk.PhotoImage
 
 # Audio (dedicated thread to avoid COM conflict with Tkinter)
 _audio_queue = queue.Queue()
@@ -134,32 +136,48 @@ def set_mute(state):
 def close_audio():
     _audio_queue.put(None)
 
-# Load image
+# Preload all images at startup (must run on main thread)
+def preload_images():
+    global preloaded_images
+    if not IMAGE_BASE_PATH.exists():
+        IMAGE_BASE_PATH.mkdir(parents=True, exist_ok=True)
+        logging.warning(f"Image dir created: {IMAGE_BASE_PATH}")
+    w, h = root.winfo_screenwidth(), root.winfo_screenheight()
+    paths = {}
+    for ext in [".jpg", ".png"]:  # png takes priority over jpg
+        for path in IMAGE_BASE_PATH.glob(f"DI_View_*{ext}"):
+            try:
+                paths[int(path.stem.split('_')[-1])] = path
+            except ValueError:
+                pass
+    for channel, path in sorted(paths.items()):
+        try:
+            img = Image.open(path)
+            img.thumbnail((w, h), Image.Resampling.LANCZOS)
+            bg = Image.new('RGB', (w, h), 'black')
+            bg.paste(img, ((w - img.width) // 2, (h - img.height) // 2))
+            preloaded_images[channel] = ImageTk.PhotoImage(bg)
+        except Exception as e:
+            logging.error(f"Preload error {path}: {e}")
+    logging.info(f"Preloaded {len(preloaded_images)} image(s)")
+
+# Load image (uses preloaded cache)
 def load_image(channel):
     global current_image
-    for ext in [".png", ".jpg"]:
-        image_path = IMAGE_BASE_PATH / f"DI_View_{channel}{ext}"
-        if image_path.exists():
-            try:
-                img = Image.open(image_path)
-                w, h = root.winfo_screenwidth(), root.winfo_screenheight()
-                img.thumbnail((w, h), Image.Resampling.LANCZOS)
-                background = Image.new('RGB', (w, h), 'black')
-                background.paste(img, ((w - img.width)//2, (h - img.height)//2))
-                current_image = ImageTk.PhotoImage(background)
-                image_label.configure(image=current_image)
-                image_label.image = current_image
-                return True
-            except Exception as e:
-                logging.error(f"Image load error: {e}")
-                return False
+    if channel in preloaded_images:
+        current_image = preloaded_images[channel]
+        image_label.configure(image=current_image)
+        image_label.image = current_image
+        return True
     image_label.configure(image='', text="No Image", font=("Arial", 36), fg="white")
     return False
 
 # Update display (runs on main thread via root.after)
 def update_display(channel, state):
+    global active_channel
     if state == 1:
         logging.info(f"Signal ON: DI{channel}")
+        active_channel = channel
         if load_image(channel):
             root.deiconify()
             root.lift()
@@ -169,7 +187,10 @@ def update_display(channel, state):
         else:
             root.deiconify()
     else:
+        if channel != active_channel:
+            return
         logging.info(f"Signal OFF: DI{channel}")
+        active_channel = None
         root.withdraw()
         set_mute(False)
 
@@ -190,13 +211,6 @@ def safe_quit():
     except:
         pass
 
-# Check images
-def check_images():
-    if not IMAGE_BASE_PATH.exists():
-        IMAGE_BASE_PATH.mkdir(parents=True, exist_ok=True)
-        logging.warning(f"Image dir created: {IMAGE_BASE_PATH}")
-    images = list(IMAGE_BASE_PATH.glob("DI_View_*.png")) + list(IMAGE_BASE_PATH.glob("DI_View_*.jpg"))
-    logging.info(f"Detected image files: {len(images)}")
 
 # Start OSC server
 def start_osc_server():
@@ -216,7 +230,7 @@ if __name__ == "__main__":
     print("="*50 + "\n")
 
     threading.Thread(target=_audio_worker, daemon=True).start()
-    check_images()
+    preload_images()
     threading.Thread(target=start_osc_server, daemon=True).start()
 
     try:
