@@ -11,6 +11,7 @@ from ctypes import cast, POINTER
 from comtypes import CLSCTX_ALL
 from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 import threading
+import queue
 from datetime import datetime
 from pythonosc.dispatcher import Dispatcher
 from pythonosc.osc_server import ThreadingOSCUDPServer
@@ -58,31 +59,36 @@ image_label.pack(fill=tk.BOTH, expand=True)
 
 # State
 current_image = None
-volume_interface = None
 
-# Audio
-def init_audio():
-    global volume_interface
+# Audio (dedicated thread to avoid COM conflict with Tkinter)
+_audio_queue = queue.Queue()
+
+def _audio_worker():
     try:
         pythoncom.CoInitialize()
         devices = AudioUtilities.GetSpeakers()
         interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-        volume_interface = cast(interface, POINTER(IAudioEndpointVolume))
-    except:
-        pass
-
-def set_mute(state):
-    if volume_interface:
+        volume = cast(interface, POINTER(IAudioEndpointVolume))
+        logging.info("Audio initialized")
+        while True:
+            state = _audio_queue.get()
+            if state is None:
+                break
+            volume.SetMute(1 if state else 0, None)
+            logging.info(f"Audio mute: {state}")
+    except Exception as e:
+        logging.warning(f"Audio init failed: {e}")
+    finally:
         try:
-            volume_interface.SetMute(1 if state else 0, None)
+            pythoncom.CoUninitialize()
         except:
             pass
 
+def set_mute(state):
+    _audio_queue.put(state)
+
 def close_audio():
-    try:
-        pythoncom.CoUninitialize()
-    except:
-        pass
+    _audio_queue.put(None)
 
 # Load image
 def load_image(channel):
@@ -164,7 +170,7 @@ if __name__ == "__main__":
     print(f" OSC Port: {OSC_PORT}")
     print("="*50 + "\n")
 
-    init_audio()
+    threading.Thread(target=_audio_worker, daemon=True).start()
     check_images()
     threading.Thread(target=start_osc_server, daemon=True).start()
 
