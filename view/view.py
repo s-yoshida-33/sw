@@ -163,6 +163,7 @@ def update_display(channel, state):
         if load_image(channel):
             root.deiconify()
             root.lift()
+            root.focus_force()
             root.attributes("-topmost", True)
             set_mute(True)
         else:
