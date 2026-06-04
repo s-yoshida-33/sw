@@ -60,6 +60,7 @@ image_label.pack(fill=tk.BOTH, expand=True)
 
 # State
 current_image = None
+active_channel = None
 
 # Audio (dedicated thread to avoid COM conflict with Tkinter)
 _audio_queue = queue.Queue()
@@ -158,8 +159,10 @@ def load_image(channel):
 
 # Update display (runs on main thread via root.after)
 def update_display(channel, state):
+    global active_channel
     if state == 1:
         logging.info(f"Signal ON: DI{channel}")
+        active_channel = channel
         if load_image(channel):
             root.deiconify()
             root.lift()
@@ -169,7 +172,10 @@ def update_display(channel, state):
         else:
             root.deiconify()
     else:
+        if channel != active_channel:
+            return
         logging.info(f"Signal OFF: DI{channel}")
+        active_channel = None
         root.withdraw()
         set_mute(False)
 
