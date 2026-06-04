@@ -75,13 +75,16 @@ def _audio_worker():
             enumerator = CreateObject(
                 CLSID_MMDeviceEnumerator, interface=IMMDeviceEnumerator
             )
-            collection = enumerator.EnumAudioEndpoints(0, 1)  # eRender, ACTIVE
+            # DEVICE_STATEMASK_ALL=15: active + disabled + unplugged endpoints
+            collection = enumerator.EnumAudioEndpoints(0, 15)
             for i in range(collection.GetCount()):
                 try:
-                    iface = collection.Item(i).Activate(
+                    device = collection.Item(i)
+                    iface = device.Activate(
                         IAudioEndpointVolume._iid_, CLSCTX_ALL, None
                     )
                     volumes.append(cast(iface, POINTER(IAudioEndpointVolume)))
+                    logging.info(f"Audio endpoint {i}: {device.GetId()}")
                 except Exception:
                     pass
         except Exception:
@@ -94,7 +97,7 @@ def _audio_worker():
             except Exception:
                 pass
 
-        logging.info(f"Audio initialized ({len(volumes)} device(s))")
+        logging.info(f"Audio initialized ({len(volumes)} endpoint(s))")
 
         while True:
             state = _audio_queue.get()
