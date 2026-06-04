@@ -1,98 +1,140 @@
-#ディレクトリ構成
+# SW Display System
+
+## システム概要
+
+di2osc デバイスのデジタル入力（DI）信号を OSC/UDP で受信し、対応する画像を全画面表示するシステムです。
+
+```
+di2osc デバイス
+    │  DI1〜DI8 のON/OFF を OSC/UDP でブロードキャスト
+    │  送信先: 255.255.255.255:9000
+    ↓
+表示機（view.py）
+    │  /di/{n} 1 → 画像を全画面表示
+    │  /di/{n} 0 → 非表示（待機状態）
+    ↓
+DI_View_{n}.png を全画面表示
+```
+
+
+## ディレクトリ構成
+
+```
 sw\
 │
 ├─ config\
-│  ├─ config.txt                                    ← srv.py & view.py 設定
-│  └─ mosquitto.conf                                ← Mosquitto 設定
+│  └─ config.txt                ← 設定ファイル（OSCポート等）
 │
-├─ html\
-│  ├─ index.html                                    ← CMS 表示用 HTML
-│  └─ monitor.html                                  ← CMS 表示用 HTML
-│
-├─ images\                                          ← 命名規則 [DI_View_(ch).png/.jpg]
-│  ├─ DI_View_0.png                                 ← DI-0 表示用画像
-│  ├─ DI_View_1.png                                 ← DI-1 表示用画像
-│  ├─ DI_View_2.png                                 ← DI-2 表示用画像
-│  ├─ DI_View_3.png                                 ← DI-3 表示用画像
-│  ├─ DI_View_4.png                                 ← DI-4 表示用画像
-│  ├─ DI_View_5.png                                 ← DI-5 表示用画像
-│  ├─ DI_View_6.png                                 ← DI-6 表示用画像
-│  └─ DI_View_7.png                                 ← DI-7 表示用画像
+├─ images\                      ← 表示画像 命名規則: DI_View_{ch}.png/.jpg
+│  ├─ DI_View_1.png             ← DI1 表示用画像
+│  ├─ DI_View_2.png             ← DI2 表示用画像
+│  ├─ DI_View_3.png             ← DI3 表示用画像
+│  ├─ DI_View_4.png             ← DI4 表示用画像
+│  ├─ DI_View_5.png             ← DI5 表示用画像
+│  ├─ DI_View_6.png             ← DI6 表示用画像
+│  ├─ DI_View_7.png             ← DI7 表示用画像
+│  └─ DI_View_8.png             ← DI8 表示用画像
 │
 ├─ installer\
-│  ├─ Advantech_IO_module_Utility_V2.7.02.msi       ← ADAM-6250 IO ユーティリティ
-│  ├─ ChromeSetup.exe                               ← Chrome インストーラー
-│  ├─ mosquitto-2.0.22-install-windows-x86.exe      ← MQTT ブローカー Mosquitto インストーラー
-│  └─ python-3.10.6-amd64.exe                       ← Python 3.10 Windows 64bit インストーラー
+│  ├─ ChromeSetup.exe           ← Chrome インストーラー
+│  └─ python-3.10.6-amd64.exe  ← Python 3.10 Windows 64bit インストーラー
 │
-├─ logs\                                            ← 各ログファイル保存
-│
-├─ server\
-│  └─ srv.py                                        ← ADAM-6250 監視 & MQTT Publish
+├─ logs\
+│  └─ YYYY-MM-DD\              ← 日付ごとにフォルダが作成される
+│     └─ view.log              ← 表示ログ
 │
 ├─ view\
-│  └─ view.py                                       ← STB側 Tkinter画面制御
+│  └─ view.py                   ← OSC/UDP 受信 & Tkinter 画面制御
 │
-├─ README.md                                        ← セットアップメモ
-├─ requirements.txt                                 ← 必要ライブラリ
-├─ start_system.bat                                 ← MQTT ブローカー & サーバー 起動ファイル
-└─ start_view.bat                                   ← Tkinter アプリ 起動ファイル
+├─ README.md
+├─ requirements.txt             ← 必要ライブラリ
+├─ start_view.bat               ← 表示アプリ 起動
+└─ stop_view.bat                ← 表示アプリ 終了
+```
 
 
-#セットアップ
-------------------------
-1. 共通（インストール）
-------------------------
-1-1. Google Chrome をインストール
-sw\installer\ChromeSetup.exe を実行
+## セットアップ
 
-1-2. Python をインストール
-sw\installer\python-3.10.6-amd64.exe を実行
-必ず「Add python.exe to PATH」(PATH に追加) にチェックを入れてインストール
+### 1. Python をインストール
 
-------------------------
-2. サーバーサイド
-------------------------
-2-1. 解凍した sw を C:\ に配置
+`sw\installer\python-3.10.6-amd64.exe` を実行
 
-2-2. Mosquitto をインストール
-sw\installer\mosquitto-2.0.22-install-windows-x86.exe を実行
+> **必ず「Add python.exe to PATH」にチェックを入れてインストールすること**
 
-2-3. ターミナル（管理者）を起動
+---
 
-2-4. ライブラリをインストール
-`cd C:\sw && pip install -r requirements.txt`
+### 2. sw フォルダを配置
 
-2-5. 設定ファイルを変更
-sw\config\config.txt `ADAM_IP`,`MQTT_BROKER`
-#suzaka
-ADAM_IP=192.168.11.104
-MQTT_BROKER=192.168.11.105
-#kamisugi
-ADAM_IP=192.168.11.105
-MQTT_BROKER=192.168.11.106
+解凍した `sw` を `C:\` 直下に配置
 
-2-6. MQTT ブローカー & サーバー を起動
-sw\start_system.bat を管理者権限で実行
+```
+C:\sw\
+```
 
-------------------------
-3. STBサイド
-------------------------
-3-1. 解凍したフォルダ sw を C:\ に配置
+---
 
-3-2. ターミナル（管理者）を起動
+### 3. ライブラリをインストール
 
-3-3. ライブラリをインストール
-`cd C:\sw && pip install -r requirements.txt`
+ターミナル（管理者）を起動し、以下を実行
 
-3-4. 設定ファイルを変更
-sw\config\config.txt `ADAM_IP`,`MQTT_BROKER`
-#suzaka
-ADAM_IP=192.168.11.104
-MQTT_BROKER=192.168.11.105
-#kamisugi
-ADAM_IP=192.168.11.105
-MQTT_BROKER=192.168.11.106
+```
+cd C:\sw
+pip install -r requirements.txt
+```
 
-3-5. Tkinter アプリ を起動
-sw\start_view.bat を管理者権限で実行
+---
+
+### 4. 設定ファイルを確認
+
+`C:\sw\config\config.txt`
+
+```
+# 表示設定
+OSC_PORT=9000
+```
+
+di2osc デバイス側の OSC ポートと一致していること（デフォルト: 9000）
+
+---
+
+### 5. 起動
+
+```
+C:\sw\start_view.bat を管理者権限で実行
+```
+
+初回起動時にスタートアップへの登録が自動で行われます。
+
+
+## 停止（メンテナンス時）
+
+```
+C:\sw\stop_view.bat を実行
+```
+
+プロセスを完全に終了します。ファイルの更新や画像の差し替えはこの後に行ってください。
+
+
+## 画像の差し替え
+
+| ファイル名 | 対応チャンネル |
+|-----------|--------------|
+| `DI_View_1.png` | DI1 |
+| `DI_View_2.png` | DI2 |
+| `DI_View_3.png` | DI3 |
+| `DI_View_4.png` | DI4 |
+| `DI_View_5.png` | DI5 |
+| `DI_View_6.png` | DI6 |
+| `DI_View_7.png` | DI7 |
+| `DI_View_8.png` | DI8 |
+
+- 対応する番号のファイルを上書きするだけで反映されます
+- `.jpg` 形式も使用可能です
+- 差し替え前に `stop_view.bat` でプロセスを終了してください
+
+
+## ログ
+
+`C:\sw\logs\YYYY-MM-DD\view.log` に日付ごとに記録されます。
+
+表示機は毎日午前3時に OS 再起動するよう別途タスクスケジューラで設定されており、再起動のタイミングで当日の日付フォルダが新たに作成されます。
