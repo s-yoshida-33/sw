@@ -66,23 +66,54 @@ _audio_queue = queue.Queue()
 def _audio_worker():
     try:
         pythoncom.CoInitialize()
-        devices = AudioUtilities.GetSpeakers()
-        dev = getattr(devices, '_dev', devices)
-        interface = dev.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-        volume = cast(interface, POINTER(IAudioEndpointVolume))
-        logging.info("Audio initialized")
+
+        def get_all_volumes():
+            volumes = []
+            try:
+                from comtypes.client import CreateObject
+                from pycaw.api.mmdeviceapi import IMMDeviceEnumerator
+                from pycaw.constants import CLSID_MMDeviceEnumerator
+                enumerator = CreateObject(
+                    CLSID_MMDeviceEnumerator, interface=IMMDeviceEnumerator
+                )
+                # eRender=0, DEVICE_STATE_ACTIVE=1
+                collection = enumerator.EnumAudioEndpoints(0, 1)
+                for i in range(collection.GetCount()):
+                    try:
+                        iface = collection.Item(i).Activate(
+                            IAudioEndpointVolume._iid_, CLSCTX_ALL, None
+                        )
+                        volumes.append(cast(iface, POINTER(IAudioEndpointVolume)))
+                    except Exception:
+                        pass
+            except Exception:
+                # fallback: default endpoint only
+                try:
+                    dev = getattr(AudioUtilities.GetSpeakers(), '_dev',
+                                  AudioUtilities.GetSpeakers())
+                    iface = dev.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+                    volumes.append(cast(iface, POINTER(IAudioEndpointVolume)))
+                except Exception:
+                    pass
+            return volumes
+
+        logging.info(f"Audio initialized ({len(get_all_volumes())} device(s))")
         while True:
             state = _audio_queue.get()
             if state is None:
                 break
-            volume.SetMute(1 if state else 0, None)
+            for volume in get_all_volumes():
+                try:
+                    volume.SetMute(1 if state else 0, None)
+                except Exception:
+                    pass
             logging.info(f"Audio mute: {state}")
     except Exception as e:
         logging.warning(f"Audio init failed: {e}")
     finally:
         try:
             pythoncom.CoUninitialize()
-        except:
+        except Exception:
             pass
 
 def set_mute(state):
