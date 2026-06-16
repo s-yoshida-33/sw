@@ -68,6 +68,7 @@ _audio_queue = queue.Queue()
 
 def _audio_worker():
     volumes = []  # COM objects must stay alive within this thread
+    original_levels = []
     try:
         pythoncom.CoInitialize()
 
@@ -105,25 +106,50 @@ def _audio_worker():
             state = _audio_queue.get()
             if state is None:
                 break
-            mute_val = 1 if state else 0
-            for volume in volumes:
+            if state:
+                # Save current levels then set volume to 0 (works for exclusive mode)
+                original_levels = []
+                for volume in volumes:
+                    try:
+                        original_levels.append(volume.GetMasterVolumeLevelScalar())
+                        volume.SetMasterVolumeLevelScalar(0.0, None)
+                    except Exception:
+                        original_levels.append(1.0)
                 try:
-                    volume.SetMute(mute_val, None)
+                    for session in AudioUtilities.GetAllSessions():
+                        try:
+                            session.SimpleAudioVolume.SetMute(1, None)
+                        except Exception:
+                            pass
                 except Exception:
                     pass
-            try:
-                for session in AudioUtilities.GetAllSessions():
+            else:
+                # Restore original levels
+                for i, volume in enumerate(volumes):
                     try:
-                        session.SimpleAudioVolume.SetMute(mute_val, None)
+                        orig = original_levels[i] if i < len(original_levels) else 1.0
+                        volume.SetMasterVolumeLevelScalar(orig, None)
                     except Exception:
                         pass
-            except Exception:
-                pass
+                try:
+                    for session in AudioUtilities.GetAllSessions():
+                        try:
+                            session.SimpleAudioVolume.SetMute(0, None)
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
 
 
     except Exception as e:
         logging.warning(f"Audio init failed: {e}")
     finally:
+        for i, volume in enumerate(volumes):
+            try:
+                orig = original_levels[i] if i < len(original_levels) else 1.0
+                volume.SetMasterVolumeLevelScalar(orig, None)
+            except Exception:
+                pass
         volumes.clear()  # release COM objects within this thread before CoUninitialize
         try:
             pythoncom.CoUninitialize()
