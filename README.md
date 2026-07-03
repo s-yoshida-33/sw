@@ -129,6 +129,8 @@ C:\sw\stop_view.bat を実行
 | `DI_View_6.png` | DI6 |
 | `DI_View_7.png` | DI7 |
 | `DI_View_8.png` | DI8 |
+| `DI_View_9.png` | DI9 |
+| `DI_View_10.png` | DI10 |
 
 - 対応する番号のファイルを上書きするだけで反映されます
 - `.jpg` 形式も使用可能です
