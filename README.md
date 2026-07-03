@@ -26,14 +26,16 @@ sw\
 │  └─ config.txt                ← 設定ファイル（OSCポート等）
 │
 ├─ images\                      ← 表示画像 命名規則: DI_View_{ch}.png/.jpg
-│  ├─ DI_View_1.png             ← DI1 表示用画像
-│  ├─ DI_View_2.png             ← DI2 表示用画像
-│  ├─ DI_View_3.png             ← DI3 表示用画像
-│  ├─ DI_View_4.png             ← DI4 表示用画像
-│  ├─ DI_View_5.png             ← DI5 表示用画像
-│  ├─ DI_View_6.png             ← DI6 表示用画像
-│  ├─ DI_View_7.png             ← DI7 表示用画像
-│  └─ DI_View_8.png             ← DI8 表示用画像
+│  ├─ DI_View_1.png             ← DI1  表示用画像
+│  ├─ DI_View_2.png             ← DI2  表示用画像
+│  ├─ DI_View_3.png             ← DI3  表示用画像
+│  ├─ DI_View_4.png             ← DI4  表示用画像
+│  ├─ DI_View_5.png             ← DI5  表示用画像
+│  ├─ DI_View_6.png             ← DI6  表示用画像
+│  ├─ DI_View_7.png             ← DI7  表示用画像
+│  ├─ DI_View_8.png             ← DI8  表示用画像
+│  ├─ DI_View_9.png             ← DI9  表示用画像
+│  └─ DI_View_10.png            ← DI10 表示用画像
 │
 ├─ installer\
 │  ├─ ChromeSetup.exe           ← Chrome インストーラー
