@@ -62,7 +62,7 @@ sw\config\config.txt の `MQTT_BROKER`, `MQTT_TOPIC` を変更
 MQTT_BROKER=192.168.11.105
 MQTT_TOPIC=kc868a16/di
 
-#kamisugi
+#sendaikamisugi
 MQTT_BROKER=192.168.11.106
 MQTT_TOPIC=kc868a16/di
 ```
@@ -86,7 +86,7 @@ sw\config\config.txt の `MQTT_BROKER`, `MQTT_TOPIC` を変更
 MQTT_BROKER=192.168.11.105
 MQTT_TOPIC=kc868a16/di
 
-#kamisugi
+#sendaikamisugi
 MQTT_BROKER=192.168.11.106
 MQTT_TOPIC=kc868a16/di
 ```
