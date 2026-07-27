@@ -32,7 +32,7 @@ logging.basicConfig(
 IMAGE_BASE_PATH = Path("C:/sw/images")
 MQTT_BROKER = "192.168.11.106"
 MQTT_PORT = 1883
-MQTT_TOPIC = "adam6250/di"
+MQTT_TOPIC = "kc868a16/di"
 
 # Config file
 config_file = Path("C:/sw/config/config.txt")
@@ -53,7 +53,7 @@ if config_file.exists():
 
 # Tkinter init
 root = tk.Tk()
-root.title("ADAM Display")
+root.title("Switch System Display")
 root.configure(bg="black")
 root.attributes("-fullscreen", True)
 root.attributes("-topmost", True)
@@ -202,7 +202,7 @@ def check_images():
 # Main process
 if __name__ == "__main__":
     print("\n" + "="*50)
-    print(" ADAM-6250 Display System")
+    print(" Switch System - Display started")
     print("="*50)
     print(f" Images: {IMAGE_BASE_PATH}")
     print(f" MQTT: {MQTT_BROKER}:{MQTT_PORT}, topic={MQTT_TOPIC}")

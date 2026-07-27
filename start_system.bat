@@ -28,14 +28,3 @@ set "MOSQUITTO_PATH=C:\Program Files (x86)\mosquitto\mosquitto.exe"
 set "MOSQUITTO_CONF=C:\sw\config\mosquitto.conf"
 
 start "" "%MOSQUITTO_PATH%" -c "%MOSQUITTO_CONF%"
-
-REM Wait a few seconds to ensure Mosquitto starts
-timeout /t 2 /nobreak >nul
-
-REM Start Python server in same window
-REM Adjust Python path if necessary
-set "PYTHON_PATH=C:\Users\Administrator\AppData\Local\Programs\Python\Python310\python.exe"
-set "SRV_PATH=C:\sw\server\srv.py"
-
-echo [INFO] Starting MQTT Server...
-cmd /k "%PYTHON_PATH% %SRV_PATH%"

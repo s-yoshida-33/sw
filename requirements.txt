@@ -1,4 +1,3 @@
-pymodbus
 paho-mqtt
 pywin32
 pillow
