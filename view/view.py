@@ -5,6 +5,7 @@ import paho.mqtt.client as mqtt
 from PIL import Image, ImageTk
 from pathlib import Path
 import logging
+import re
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 import pythoncom
@@ -62,7 +63,6 @@ image_label.pack(fill=tk.BOTH, expand=True)
 
 # State
 current_signal_str = "OFF"
-current_di_bits = [0]*8
 current_image = None
 volume_interface = None
 
@@ -118,27 +118,30 @@ def load_image(di_index):
     )
     return False
 
+# Parse DI channel index from payload (no channel count limit)
+DI_PAYLOAD_RE = re.compile(r"^(?:ON\s*\[DI-(\d+)\]|(\d+))$", re.IGNORECASE)
+
+def parse_di_index(payload):
+    if payload.upper() == "OFF":
+        return None
+    m = DI_PAYLOAD_RE.match(payload)
+    if not m:
+        return None
+    return int(m.group(1) or m.group(2))
+
 # Update display
 def update_display(payload):
-    global current_signal_str, current_di_bits
+    global current_signal_str
     payload = payload.strip()
-    # Unified format: OFF / ON [DI-n]
-    signal_str = "OFF"
-    di_bits = [0]*8
-    for i in range(8):
-        if payload == str(i) or payload.upper() == f"ON [DI-{i}]":
-            signal_str = f"ON [DI-{i}]"
-            di_bits[i] = 1
-            break
+    di_index = parse_di_index(payload)
+    signal_str = "OFF" if di_index is None else f"ON [DI-{di_index}]"
     if signal_str != current_signal_str:
         logging.info(f"Signal changed: {current_signal_str} → {signal_str}")
         current_signal_str = signal_str
-        current_di_bits[:] = di_bits
-        if signal_str == "OFF":
+        if di_index is None:
             root.withdraw()
             set_mute(False)
         else:
-            di_index = di_bits.index(1)
             if load_image(di_index):
                 root.deiconify()
                 root.lift()

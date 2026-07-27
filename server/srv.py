@@ -30,6 +30,7 @@ logging.basicConfig(
 # Default settings
 ADAM_IP = "192.168.11.105"
 MODBUS_PORT = 502
+DI_CHANNEL_COUNT = 16
 MQTT_BROKER = "192.168.11.106"
 MQTT_PORT = 1883
 MQTT_TOPIC = "adam6250/di"
@@ -52,6 +53,7 @@ if config_file.exists():
             key, value = key.strip(), value.strip()
             if key == "ADAM_IP": ADAM_IP = value
             elif key == "MODBUS_PORT": MODBUS_PORT = int(value)
+            elif key == "DI_CHANNEL_COUNT": DI_CHANNEL_COUNT = int(value)
             elif key == "MQTT_BROKER": MQTT_BROKER = value
             elif key == "MQTT_PORT": MQTT_PORT = int(value)
             elif key == "MQTT_TOPIC": MQTT_TOPIC = value
@@ -61,7 +63,7 @@ if config_file.exists():
 # Globals
 current_signal_str = "OFF"
 last_signal_str = "OFF"
-di_bits = [0]*8
+di_bits = [0]*DI_CHANNEL_COUNT
 communication_logs = []
 max_logs = 100
 csv_log_file = LOG_DIR / 'srv_log.csv'
@@ -270,8 +272,8 @@ def main():
 
             if client_modbus:
                 try:
-                    rr = client_modbus.read_discrete_inputs(address=0, count=8)
-                    di_bits = rr.bits if not rr.isError() else [0]*8
+                    rr = client_modbus.read_discrete_inputs(address=0, count=DI_CHANNEL_COUNT)
+                    di_bits = rr.bits if not rr.isError() else [0]*DI_CHANNEL_COUNT
 
                     signal_str = "OFF"
                     for i, bit in enumerate(di_bits):
@@ -284,7 +286,7 @@ def main():
                         last_signal_str = signal_str
                 except Exception as e:
                     add_communication_log("MODBUS", ADAM_IP, f"Error: {str(e)}", "ERROR")
-                    di_bits = [0]*8
+                    di_bits = [0]*DI_CHANNEL_COUNT
                     signal_str = "OFF"
                     try:
                         client_modbus.close()
@@ -293,7 +295,7 @@ def main():
                     client_modbus = None
                     last_modbus_attempt = time.time()
             else:
-                di_bits = [0]*8
+                di_bits = [0]*DI_CHANNEL_COUNT
                 signal_str = "OFF"
 
             current_signal_str = signal_str
