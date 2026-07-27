@@ -8,8 +8,8 @@ sw\
 │  └─ mosquitto.conf                                ← Mosquitto 設定
 │
 ├─ images\                                          ← 命名規則 [DI_View_(ch).png/.jpg]
-│  │                                                   ch番号に上限なし。DI_View_(ch)の画像を配置すれば
-│  │                                                   そのchの信号がONになった際に自動で表示される
+│  │                                                  ※ch番号に上限なし
+│  │                                                  ※DI_View_(ch)の画像を配置すれば、そのchの信号がONになった際に自動で表示される
 │  ├─ DI_View_0.png                                 ← DI-0 表示用画像
 │  ├─ DI_View_1.png                                 ← DI-1 表示用画像
 │  ├─ DI_View_2.png                                 ← DI-2 表示用画像
