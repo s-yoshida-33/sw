@@ -10,14 +10,13 @@ sw\
 │  └─ monitor.html                                  ← CMS 表示用 HTML
 │
 ├─ images\                                          ← 命名規則 [DI_View_(ch).png/.jpg]
+│  │                                                   ch番号に上限なし。DI_View_(ch)の画像を配置すれば
+│  │                                                   そのchの信号がONになった際に自動で表示される
 │  ├─ DI_View_0.png                                 ← DI-0 表示用画像
 │  ├─ DI_View_1.png                                 ← DI-1 表示用画像
 │  ├─ DI_View_2.png                                 ← DI-2 表示用画像
-│  ├─ DI_View_3.png                                 ← DI-3 表示用画像
-│  ├─ DI_View_4.png                                 ← DI-4 表示用画像
-│  ├─ DI_View_5.png                                 ← DI-5 表示用画像
-│  ├─ DI_View_6.png                                 ← DI-6 表示用画像
-│  └─ DI_View_7.png                                 ← DI-7 表示用画像
+│  ├─ ...
+│  └─ DI_View_15.png                                ← DI-15 表示用画像（KC868-A16は16ch）
 │
 ├─ installer\
 │  ├─ Advantech_IO_module_Utility_V2.7.02.msi       ← ADAM-6250 IO ユーティリティ
@@ -64,7 +63,7 @@ sw\installer\mosquitto-2.0.22-install-windows-x86.exe を実行
 `cd C:\sw && pip install -r requirements.txt`
 
 2-5. 設定ファイルを変更
-sw\config\config.txt `ADAM_IP`,`MQTT_BROKER`
+sw\config\config.txt `ADAM_IP`,`MQTT_BROKER`,`DI_CHANNEL_COUNT`（DIモジュールのch数。ADAM-6250は8、KC868-A16は16）
 #suzaka
 ADAM_IP=192.168.11.104
 MQTT_BROKER=192.168.11.105
