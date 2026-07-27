@@ -1,4 +1,6 @@
-#ディレクトリ構成
+# ディレクトリ構成
+
+```
 sw\
 │
 ├─ config\
@@ -28,12 +30,12 @@ sw\
 ├─ requirements.txt                                 ← 必要ライブラリ
 ├─ start_system.bat                                 ← MQTT ブローカー 起動ファイル
 └─ start_view.bat                                   ← Tkinter アプリ 起動ファイル
+```
 
+# セットアップ
 
-#セットアップ
-------------------------
-1. 共通（インストール）
-------------------------
+## 1. 共通（インストール）
+
 1-1. Google Chrome をインストール
 sw\installer\ChromeSetup.exe を実行
 
@@ -41,9 +43,8 @@ sw\installer\ChromeSetup.exe を実行
 sw\installer\python-3.10.6-amd64.exe を実行
 必ず「Add python.exe to PATH」(PATH に追加) にチェックを入れてインストール
 
-------------------------
-2. サーバーサイド
-------------------------
+## 2. サーバーサイド
+
 2-1. 解凍した sw を C:\ に配置
 
 2-2. Mosquitto をインストール
@@ -55,20 +56,22 @@ sw\installer\mosquitto-2.0.22-install-windows-x86.exe を実行
 `cd C:\sw && pip install -r requirements.txt`
 
 2-5. 設定ファイルを変更
-sw\config\config.txt `MQTT_BROKER`,`MQTT_TOPIC`
+sw\config\config.txt の `MQTT_BROKER`, `MQTT_TOPIC` を変更
+```
 #suzaka
 MQTT_BROKER=192.168.11.105
 MQTT_TOPIC=kc868a16/di
+
 #kamisugi
 MQTT_BROKER=192.168.11.106
 MQTT_TOPIC=kc868a16/di
+```
 
 2-6. MQTT ブローカー を起動
 sw\start_system.bat を管理者権限で実行
 
-------------------------
-3. STBサイド
-------------------------
+## 3. STBサイド
+
 3-1. 解凍したフォルダ sw を C:\ に配置
 
 3-2. ターミナル（管理者）を起動
@@ -77,13 +80,16 @@ sw\start_system.bat を管理者権限で実行
 `cd C:\sw && pip install -r requirements.txt`
 
 3-4. 設定ファイルを変更
-sw\config\config.txt `MQTT_BROKER`,`MQTT_TOPIC`
+sw\config\config.txt の `MQTT_BROKER`, `MQTT_TOPIC` を変更
+```
 #suzaka
 MQTT_BROKER=192.168.11.105
 MQTT_TOPIC=kc868a16/di
+
 #kamisugi
 MQTT_BROKER=192.168.11.106
 MQTT_TOPIC=kc868a16/di
+```
 
 3-5. Tkinter アプリ を起動
 sw\start_view.bat を管理者権限で実行
