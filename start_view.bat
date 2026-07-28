@@ -14,8 +14,8 @@ if not exist "%STARTUP_DIR%\%~nx0" (
 )
 
 REM Start Python view.py in new window with logging
-set "PYTHON_PATH=C:\Users\WonderScreen\AppData\Local\Programs\Python\Python310\python.exe"
-set "VIEW_PATH=C:\sw\view\view.py"
+set "PYTHON_PATH=C:\Users\%USERNAME%\AppData\Local\Programs\Python\Python310\python.exe"
+set "VIEW_PATH=%~dp0view\view.py"
 
 echo [INFO] Starting View...
 start "Display Viewer" /min "%PYTHON_PATH%" "%VIEW_PATH%"
