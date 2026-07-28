@@ -10,11 +10,11 @@ sw\
 ├─ images\                                          ← 命名規則 [DI_View_(ch).png/.jpg]
 │  │                                                  ※ch番号に上限なし
 │  │                                                  ※DI_View_(ch)の画像を配置すれば、そのchの信号がONになった際に自動で表示される
-│  ├─ DI_View_0.png                                 ← DI-0 表示用画像
 │  ├─ DI_View_1.png                                 ← DI-1 表示用画像
 │  ├─ DI_View_2.png                                 ← DI-2 表示用画像
+│  ├─ DI_View_3.png                                 ← DI-3 表示用画像
 │  ├─ ...
-│  └─ DI_View_15.png                                ← DI-15 表示用画像（KC868-A16は16ch）
+│  └─ DI_View_16.png                                ← DI-16 表示用画像（KC868-A16は16ch）
 │
 ├─ installer\
 │  ├─ ChromeSetup.exe                               ← Chrome インストーラー
