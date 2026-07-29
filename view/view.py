@@ -9,9 +9,7 @@ import re
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 import pythoncom
-from ctypes import cast, POINTER
-from comtypes import CLSCTX_ALL
-from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
+from pycaw.pycaw import AudioUtilities, EDataFlow, DEVICE_STATE
 import time
 from datetime import datetime
 
@@ -64,31 +62,59 @@ image_label.pack(fill=tk.BOTH, expand=True)
 # State
 current_signal_str = "OFF"
 current_image = None
-volume_interface = None
+saved_volumes = {}
+is_muted = False
 
 # Audio
 def init_audio():
-    global volume_interface
     try:
         pythoncom.CoInitialize()
-        devices = AudioUtilities.GetSpeakers()
-        interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-        volume_interface = cast(interface, POINTER(IAudioEndpointVolume))
-    except:
-        pass
+    except Exception as e:
+        logging.error(f"Audio init error: {e}")
 
+# Devices may have more than one *active* render endpoint at once (e.g. an
+# onboard "Speaker" device plus an HDMI-connected display's speakers set as
+# the default communications device). Controlling only the single default
+# device silently fails to mute audio that plays through the other one, so
+# every active render endpoint is muted/restored, not just GetSpeakers().
+def _active_render_devices():
+    try:
+        return AudioUtilities.GetAllDevices(EDataFlow.eRender.value, DEVICE_STATE.ACTIVE.value)
+    except Exception as e:
+        logging.error(f"Audio device enum error: {e}")
+        return []
+
+# Note: SetMute alone is not silenced over some remote-audio-capture paths
+# (e.g. RustDesk), which follow the volume level but not the mute flag.
+# Drive the volume level itself to 0 so muting is effective everywhere.
 def set_mute(state):
-    if volume_interface:
+    global saved_volumes, is_muted
+    # update_display() calls set_mute(True) on every ON signal, including
+    # ON -> ON transitions between different DI indexes. Without this guard,
+    # a second call while already muted would re-read the current (already
+    # zeroed) volume and clobber the originally saved value with 0.
+    if state == is_muted:
+        return
+    for device in _active_render_devices():
         try:
-            volume_interface.SetMute(1 if state else 0, None)
-        except:
-            pass
+            vol = device.EndpointVolume
+            if state:
+                saved_volumes[device.id] = vol.GetMasterVolumeLevelScalar()
+                vol.SetMasterVolumeLevelScalar(0.0, None)
+                vol.SetMute(1, None)
+            else:
+                vol.SetMute(0, None)
+                if device.id in saved_volumes:
+                    vol.SetMasterVolumeLevelScalar(saved_volumes[device.id], None)
+        except Exception as e:
+            logging.error(f"Audio mute error ({device.FriendlyName}): {e}")
+    is_muted = state
 
 def close_audio():
     try:
         pythoncom.CoUninitialize()
-    except:
-        pass
+    except Exception as e:
+        logging.error(f"Audio close error: {e}")
 
 # Load image
 def load_image(di_index):
