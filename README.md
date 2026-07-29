@@ -28,8 +28,10 @@ sw\
 │
 ├─ README.md                                        ← セットアップメモ
 ├─ requirements.txt                                 ← 必要ライブラリ
-├─ start_system.bat                                 ← MQTT ブローカー 起動ファイル
-└─ start_view.bat                                   ← Tkinter アプリ 起動ファイル
+├─ start_system.ps1                                 ← MQTT ブローカー 起動・タスク登録ファイル
+├─ stop_system.ps1                                  ← MQTT ブローカー 停止ファイル
+├─ start_view.ps1                                   ← Tkinter アプリ 起動・タスク登録ファイル
+└─ stop_view.ps1                                    ← Tkinter アプリ 停止ファイル
 ```
 
 # セットアップ
@@ -50,7 +52,12 @@ sw\installer\mosquitto-2.0.22-install-windows-x86.exe を実行
 
 2-3. MQTT ブローカー を起動
 
-sw\start_system.bat を管理者権限で実行
+管理者権限の PowerShell で以下を実行（初回はタスクスケジューラに自動起動タスク "MosquittoAutoStart" と、毎日3時の再起動タスク "SrvDailyRestart" を登録し、そのまま Mosquitto を起動する）
+
+```
+cd C:\sw
+powershell -ExecutionPolicy Bypass -File .\start_system.ps1
+```
 
 ## 3. STBサイド
 
@@ -83,4 +90,9 @@ MQTT_TOPIC=kc868a16/di
 
 3-6. Tkinter アプリ を起動
 
-sw\start_view.bat を管理者権限で実行
+管理者権限の PowerShell で以下を実行（初回はタスクスケジューラに自動起動タスク "DisplayViewerAutoStart"（ログオン時起動）を登録し、そのまま Tkinter アプリを起動する）
+
+```
+cd C:\sw
+powershell -ExecutionPolicy Bypass -File .\start_view.ps1
+```
