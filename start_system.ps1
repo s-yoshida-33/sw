@@ -13,7 +13,9 @@ if (-not (Get-ScheduledTask -TaskName $MosquittoTaskName -ErrorAction SilentlyCo
     $trigger   = New-ScheduledTaskTrigger -AtStartup
     $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
     $settings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
-    Register-ScheduledTask -TaskName $MosquittoTaskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings | Out-Null
+    $task = New-ScheduledTask -Action $action -Trigger $trigger -Principal $principal -Settings $settings
+    $task.Author = "$env:USERDOMAIN\$env:USERNAME"
+    Register-ScheduledTask -TaskName $MosquittoTaskName -InputObject $task | Out-Null
 } else {
     Write-Host "[INFO] Scheduled task '$MosquittoTaskName' already registered."
 }
@@ -25,7 +27,9 @@ if (-not (Get-ScheduledTask -TaskName $RestartTaskName -ErrorAction SilentlyCont
     $action    = New-ScheduledTaskAction -Execute "shutdown.exe" -Argument "/r /f /t 0"
     $trigger   = New-ScheduledTaskTrigger -Daily -At "03:00"
     $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
-    Register-ScheduledTask -TaskName $RestartTaskName -Action $action -Trigger $trigger -Principal $principal | Out-Null
+    $task = New-ScheduledTask -Action $action -Trigger $trigger -Principal $principal
+    $task.Author = "$env:USERDOMAIN\$env:USERNAME"
+    Register-ScheduledTask -TaskName $RestartTaskName -InputObject $task | Out-Null
 } else {
     Write-Host "[INFO] Daily restart task '$RestartTaskName' already registered."
 }
