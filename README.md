@@ -126,7 +126,7 @@ powershell -ExecutionPolicy Bypass -File .\start_system.ps1
 
 sw\installer\python-3.10.6-amd64.exe を実行
 
-必ず「Add python.exe to PATH」(PATH に追加) にチェックを入れてインストール
+> 必ず **「Add python.exe to PATH」(PATH に追加)** にチェックを入れてインストール
 
 3-3. ターミナル（管理者）を起動
 
