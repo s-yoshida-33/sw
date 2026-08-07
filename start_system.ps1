@@ -5,6 +5,15 @@ $host.UI.RawUI.WindowTitle = "MQTT Server"
 $MosquittoPath = "C:\Program Files (x86)\mosquitto\mosquitto.exe"
 $MosquittoConf = "C:\sw\config\mosquitto.conf"
 
+# --- Disable the Windows service registered by the Mosquitto installer ---
+# (it auto-starts with the default config and duplicates the process started below via config\mosquitto.conf)
+$MosquittoService = Get-Service -Name "mosquitto" -ErrorAction SilentlyContinue
+if ($MosquittoService -and $MosquittoService.StartType -ne "Disabled") {
+    Write-Host "[INFO] Disabling default 'mosquitto' Windows service..."
+    Stop-Service -Name "mosquitto" -ErrorAction SilentlyContinue
+    Set-Service -Name "mosquitto" -StartupType Disabled
+}
+
 # --- Mosquitto auto-start task registration (system boot, no interactive logon needed) ---
 $MosquittoTaskName = "MosquittoAutoStart"
 if (-not (Get-ScheduledTask -TaskName $MosquittoTaskName -ErrorAction SilentlyContinue)) {
