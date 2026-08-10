@@ -29,6 +29,7 @@ sw\
 ├─ README.md                                        ← セットアップメモ
 ├─ requirements.txt                                 ← 必要ライブラリ
 ├─ start_system.ps1                                 ← MQTT ブローカー 起動・タスク登録ファイル
+├─ run_mosquitto.ps1                                ← MQTT ブローカー ログローテーション + 起動（タスクスケジューラから実行）
 ├─ stop_system.ps1                                  ← MQTT ブローカー 停止ファイル
 ├─ start_view.ps1                                   ← Tkinter アプリ 起動・タスク登録ファイル
 └─ stop_view.ps1                                    ← Tkinter アプリ 停止ファイル
@@ -73,11 +74,11 @@ KC868-A16 の DI（デジタル入力）チャンネルの ON/OFF を MQTT 経�
 
 ## 自動起動・タスクスケジューラ仕様
 
-`start_system.ps1` / `start_view.ps1` を一度実行すると、以下のタスクがタスクスケジューラに登録され（既に登録済みの場合はスキップ）、以降は自動起動する。
+`start_system.ps1` / `start_view.ps1` を一度実行すると、以下のタスクがタスクスケジューラに登録され、以降は自動起動する（`MosquittoAutoStart` は起動コマンドを最新化するため毎回上書き登録、他は既に登録済みの場合はスキップ）。
 
 | タスク名 | トリガー | 実行アカウント | 内容 |
 |---|---|---|---|
-| `MosquittoAutoStart` | システム起動時 | SYSTEM | Mosquitto を起動 |
+| `MosquittoAutoStart` | システム起動時 | SYSTEM | `run_mosquitto.ps1` を実行（ログローテーション後、Mosquitto を起動） |
 | `SrvDailyRestart` | 毎日 03:00 | SYSTEM | サーバーPCを再起動 |
 | `DisplayViewerAutoStart` | ログオン時 | 実行ユーザー | `view.py` を起動 |
 
@@ -88,6 +89,7 @@ KC868-A16 の DI（デジタル入力）チャンネルの ON/OFF を MQTT 経�
 - `view.py`：`logs\view-<yyyy-mm-dd>.log` に日付ごとにINFO/ERRORレベルで出力（信号変化、MQTT接続状況、画像読み込み・音声制御のエラーなど）
   - `view.py` 起動時（STBは信号機アプリのタスクにより毎日AM3時に再起動）に、当月以外の日別ログを月単位（`logs\<yyyy-mm>.zip`）にまとめて元ファイルを削除し、作成から12か月を超えたzipを削除する
 - Mosquitto：`logs\mqtt.log` にエラーログのみ出力（`config\mosquitto.conf` の `log_type error` 設定による）
+  - `run_mosquitto.ps1`（サーバーPC起動時に`MosquittoAutoStart`タスクから実行）が、起動前の`mqtt.log`を前日日付の`logs\mqtt-<yyyy-mm-dd>.log`にリネームし、当月以外の日別ログを月単位（`logs\mqtt-<yyyy-mm>.zip`）にまとめて元ファイルを削除、作成から12か月を超えたzipを削除してからMosquittoを起動する
 
 ## 設定ファイル仕様
 
