@@ -14,15 +14,16 @@ import time
 from datetime import datetime
 
 # Logging
-LOG_DIR = Path("C:/sw/logs") / datetime.now().strftime("%Y-%m-%d")
+LOG_DIR = Path("C:/sw/logs")
 LOG_DIR.mkdir(parents=True, exist_ok=True)
+LOG_FILE = LOG_DIR / f"view-{datetime.now().strftime('%Y-%m-%d')}.log"
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler(LOG_DIR / "view.log", encoding="utf-8")
+        logging.FileHandler(LOG_FILE, encoding="utf-8")
     ]
 )
 
