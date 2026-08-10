@@ -4,7 +4,7 @@
 sw\
 │
 ├─ config\
-│  ├─ config.txt                                    ← view.py 設定
+│  ├─ config.txt                                    ← view.py / signal_logger.py 設定
 │  └─ mosquitto.conf                                ← Mosquitto 設定
 │
 ├─ images\                                          ← 命名規則 [DI_View_(ch).png/.jpg]
@@ -23,11 +23,15 @@ sw\
 │
 ├─ logs\                                            ← 各ログファイル保存
 │
+├─ server\
+│  ├─ signal_logger.py                              ← サーバー側 DI信号履歴ロガー
+│  └─ requirements.txt                              ← signal_logger.py 用ライブラリ
+│
 ├─ view\
-│  └─ view.py                                       ← STB側 Tkinter画面制御
+│  ├─ view.py                                       ← STB側 Tkinter画面制御
+│  └─ requirements.txt                              ← view.py 用ライブラリ
 │
 ├─ README.md                                        ← セットアップメモ
-├─ requirements.txt                                 ← 必要ライブラリ
 ├─ start_system.ps1                                 ← MQTT ブローカー 起動・タスク登録ファイル
 ├─ stop_system.ps1                                  ← MQTT ブローカー 停止ファイル
 ├─ start_view.ps1                                   ← Tkinter アプリ 起動・タスク登録ファイル
@@ -42,7 +46,7 @@ KC868-A16 の DI（デジタル入力）チャンネルの ON/OFF を MQTT 経�
 
 画像表示中は STB の音声出力をミュートする。
 
-- サーバー側：Mosquitto（MQTT ブローカー）
+- サーバー側：Mosquitto（MQTT ブローカー）、`signal_logger.py`（DI信号履歴のログ記録）
 - STB側：`view.py`（Tkinter によるフルスクリーン画像表示 + 音声ミュート制御）
 - KC868-A16：DI 信号を MQTT で送信するハードウェア
 
@@ -78,20 +82,22 @@ KC868-A16 の DI（デジタル入力）チャンネルの ON/OFF を MQTT 経�
 | タスク名 | トリガー | 実行アカウント | 内容 |
 |---|---|---|---|
 | `MosquittoAutoStart` | システム起動時 | SYSTEM | Mosquitto を起動 |
+| `SignalLoggerAutoStart` | システム起動時 | SYSTEM | `signal_logger.py` を起動 |
 | `SrvDailyRestart` | 毎日 03:00 | SYSTEM | サーバーPCを再起動 |
 | `DisplayViewerAutoStart` | ログオン時 | 実行ユーザー | `view.py` を起動 |
 
-停止する場合は `stop_system.ps1`（Mosquitto停止）、`stop_view.ps1`（`view.py`停止）を実行する。
+停止する場合は `stop_system.ps1`（Mosquitto・`signal_logger.py`停止）、`stop_view.ps1`（`view.py`停止）を実行する。
 
 ## ログ仕様
 
 - `view.py`：`logs\view-<yyyy-mm-dd>.log` に日付ごとにINFO/ERRORレベルで出力（信号変化、MQTT接続状況、画像読み込み・音声制御のエラーなど）
   - `view.py` 起動時（STBは信号機アプリのタスクにより毎日AM3時に再起動）に、当月以外の日別ログを月単位（`logs\<yyyy-mm>.zip`）にまとめて元ファイルを削除し、作成から12か月を超えたzipを削除する
+- `signal_logger.py`：`logs\signal-<yyyy-mm-dd>.log` に日付ごとにINFO/ERRORレベルで出力（信号変化、MQTT接続状況など。STBに依存せずサーバー単体で信号履歴を確認できる。`view-*.log`と同様の月次zip化・12か月保持を行う）
 - Mosquitto：`logs\mqtt.log` にエラーログのみ出力（`config\mosquitto.conf` の `log_type error` 設定による）
 
 ## 設定ファイル仕様
 
-- `config\config.txt`：`MQTT_BROKER`, `MQTT_PORT`, `MQTT_TOPIC` を指定
+- `config\config.txt`：`MQTT_BROKER`, `MQTT_PORT`, `MQTT_TOPIC` を指定（`signal_logger.py`は`MQTT_PORT`, `MQTT_TOPIC`のみ使用し、ブローカーは常に自ホスト`127.0.0.1`に接続）
 - `config\mosquitto.conf`：リスナーポート（既定 1883、全インターフェースで待受）、匿名接続許可、ログ出力先を指定
 
 # セットアップ
@@ -110,9 +116,19 @@ sw\installer\ChromeSetup.exe を実行
 
 sw\installer\mosquitto-2.0.22-install-windows-x86.exe を実行
 
-2-3. MQTT ブローカー を起動
+2-3. Python をインストール（`signal_logger.py` 用）
 
-管理者権限の PowerShell で以下を実行（初回はタスクスケジューラに自動起動タスク "MosquittoAutoStart" と、毎日3時の再起動タスク "SrvDailyRestart" を登録し、そのまま Mosquitto を起動する）
+sw\installer\python-3.10.6-amd64.exe を実行
+
+> 必ず **「Add python.exe to PATH」(PATH に追加)** にチェックを入れてインストール
+
+2-4. ライブラリをインストール
+
+`cd C:\sw\server && pip install -r requirements.txt`
+
+2-5. MQTT ブローカー・signal_logger を起動
+
+管理者権限の PowerShell で以下を実行（初回はタスクスケジューラに自動起動タスク "MosquittoAutoStart"・"SignalLoggerAutoStart" と、毎日3時の再起動タスク "SrvDailyRestart" を登録し、そのまま Mosquitto と `signal_logger.py` を起動する）
 
 ```
 cd C:\sw
@@ -133,7 +149,7 @@ sw\installer\python-3.10.6-amd64.exe を実行
 
 3-4. ライブラリをインストール
 
-`cd C:\sw && pip install -r requirements.txt`
+`cd C:\sw\view && pip install -r requirements.txt`
 
 3-5. 設定ファイルを変更
 

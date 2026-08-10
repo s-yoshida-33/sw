@@ -4,6 +4,8 @@ $host.UI.RawUI.WindowTitle = "MQTT Server"
 
 $MosquittoPath = "C:\Program Files (x86)\mosquitto\mosquitto.exe"
 $MosquittoConf = "C:\sw\config\mosquitto.conf"
+$PythonPath    = "C:\Users\$env:USERNAME\AppData\Local\Programs\Python\Python310\python.exe"
+$SignalLogger  = "C:\sw\server\signal_logger.py"
 
 # --- Disable the Windows service registered by the Mosquitto installer ---
 # (it auto-starts with the default config and duplicates the process started below via config\mosquitto.conf)
@@ -43,6 +45,23 @@ if (-not (Get-ScheduledTask -TaskName $RestartTaskName -ErrorAction SilentlyCont
     Write-Host "[INFO] Daily restart task '$RestartTaskName' already registered."
 }
 
-# Start Mosquitto in background now (logs configured in mosquitto.conf)
+# --- Signal logger auto-start task registration (system boot) ---
+$SignalLoggerTaskName = "SignalLoggerAutoStart"
+if (-not (Get-ScheduledTask -TaskName $SignalLoggerTaskName -ErrorAction SilentlyContinue)) {
+    Write-Host "[INFO] Registering scheduled task '$SignalLoggerTaskName'..."
+    $action    = New-ScheduledTaskAction -Execute $PythonPath -Argument "`"$SignalLogger`""
+    $trigger   = New-ScheduledTaskTrigger -AtStartup
+    $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+    $settings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+    $task = New-ScheduledTask -Action $action -Trigger $trigger -Principal $principal -Settings $settings
+    $task.Author = "$env:USERDOMAIN\$env:USERNAME"
+    Register-ScheduledTask -TaskName $SignalLoggerTaskName -InputObject $task | Out-Null
+} else {
+    Write-Host "[INFO] Scheduled task '$SignalLoggerTaskName' already registered."
+}
+
+# Start Mosquitto and the signal logger in background now (logs configured in mosquitto.conf / signal_logger.py)
 Write-Host "[INFO] Starting Mosquitto..."
 Start-Process -FilePath $MosquittoPath -ArgumentList "-c `"$MosquittoConf`""
+Write-Host "[INFO] Starting Signal Logger..."
+Start-Process -FilePath $PythonPath -ArgumentList "`"$SignalLogger`"" -WindowStyle Minimized
