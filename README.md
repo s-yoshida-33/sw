@@ -86,6 +86,7 @@ KC868-A16 の DI（デジタル入力）チャンネルの ON/OFF を MQTT 経�
 ## ログ仕様
 
 - `view.py`：`logs\view-<yyyy-mm-dd>.log` に日付ごとにINFO/ERRORレベルで出力（信号変化、MQTT接続状況、画像読み込み・音声制御のエラーなど）
+  - `view.py` 起動時（STBは信号機アプリのタスクにより毎日AM3時に再起動）に、当月以外の日別ログを月単位（`logs\<yyyy-mm>.zip`）にまとめて元ファイルを削除し、作成から12か月を超えたzipを削除する
 - Mosquitto：`logs\mqtt.log` にエラーログのみ出力（`config\mosquitto.conf` の `log_type error` 設定による）
 
 ## 設定ファイル仕様

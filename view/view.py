@@ -11,6 +11,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 import pythoncom
 from pycaw.pycaw import AudioUtilities, EDataFlow, DEVICE_STATE
 import time
+import zipfile
 from datetime import datetime
 
 # Logging
@@ -26,6 +27,47 @@ logging.basicConfig(
         logging.FileHandler(LOG_FILE, encoding="utf-8")
     ]
 )
+
+# Log retention: the STB reboots daily (signage app's own 3AM task), so a
+# startup-time check is enough to catch every month boundary without needing
+# an in-process timer.
+DAILY_LOG_RE = re.compile(r"^view-(\d{4}-\d{2})-\d{2}\.log$")
+MONTHLY_ZIP_RE = re.compile(r"^(\d{4})-(\d{2})\.zip$")
+ZIP_RETENTION_MONTHS = 12
+
+def archive_past_month_logs():
+    current_month = datetime.now().strftime("%Y-%m")
+    months = {}
+    for log_file in LOG_DIR.glob("view-*.log"):
+        m = DAILY_LOG_RE.match(log_file.name)
+        if m and m.group(1) != current_month:
+            months.setdefault(m.group(1), []).append(log_file)
+    for month, files in months.items():
+        zip_path = LOG_DIR / f"{month}.zip"
+        try:
+            with zipfile.ZipFile(zip_path, "a", zipfile.ZIP_DEFLATED) as zf:
+                for f in files:
+                    zf.write(f, f.name)
+            for f in files:
+                f.unlink()
+            logging.info(f"Archived {len(files)} log file(s) into {zip_path.name}")
+        except Exception as e:
+            logging.error(f"Log archive error ({month}): {e}")
+
+def cleanup_old_archives():
+    now = datetime.now()
+    now_index = now.year * 12 + now.month
+    for zip_file in LOG_DIR.glob("*.zip"):
+        m = MONTHLY_ZIP_RE.match(zip_file.name)
+        if not m:
+            continue
+        zip_index = int(m.group(1)) * 12 + int(m.group(2))
+        if now_index - zip_index >= ZIP_RETENTION_MONTHS:
+            try:
+                zip_file.unlink()
+                logging.info(f"Deleted expired log archive: {zip_file.name}")
+            except Exception as e:
+                logging.error(f"Log archive cleanup error ({zip_file.name}): {e}")
 
 # Default settings
 IMAGE_BASE_PATH = Path("C:/sw/images")
@@ -235,6 +277,8 @@ if __name__ == "__main__":
     print(f" MQTT: {MQTT_BROKER}:{MQTT_PORT}, topic={MQTT_TOPIC}")
     print("="*50 + "\n")
 
+    archive_past_month_logs()
+    cleanup_old_archives()
     init_audio()
     check_images()
     connect_mqtt()
