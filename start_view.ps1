@@ -9,16 +9,19 @@ $TaskName   = "DisplayViewerAutoStart"
 
 if (-not (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue)) {
     Write-Host "[INFO] Registering scheduled task '$TaskName'..."
-    $action    = New-ScheduledTaskAction -Execute $PythonPath -Argument "`"$ViewPath`""
-    $trigger   = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
-    $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
-    $settings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
-    $task = New-ScheduledTask -Action $action -Trigger $trigger -Principal $principal -Settings $settings
-    $task.Author = "$env:USERDOMAIN\$env:USERNAME"
-    Register-ScheduledTask -TaskName $TaskName -InputObject $task | Out-Null
 } else {
-    Write-Host "[INFO] Scheduled task '$TaskName' already registered."
+    Write-Host "[INFO] Updating scheduled task '$TaskName'..."
 }
+# Delay app launch after logon so the server's MQTT broker (started at boot) is
+# reliably up before view.py's first connection attempt.
+$action    = New-ScheduledTaskAction -Execute $PythonPath -Argument "`"$ViewPath`""
+$trigger   = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+$trigger.Delay = "PT90S"
+$principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
+$settings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+$task = New-ScheduledTask -Action $action -Trigger $trigger -Principal $principal -Settings $settings
+$task.Author = "$env:USERDOMAIN\$env:USERNAME"
+Register-ScheduledTask -TaskName $TaskName -InputObject $task -Force | Out-Null
 
 Write-Host "[INFO] Starting View..."
 Start-Process -FilePath $PythonPath -ArgumentList "`"$ViewPath`"" -WindowStyle Minimized

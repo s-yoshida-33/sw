@@ -77,14 +77,14 @@ KC868-A16 の DI（デジタル入力）チャンネルの ON/OFF を MQTT 経�
 
 ## 自動起動・タスクスケジューラ仕様
 
-`start_system.ps1` / `start_view.ps1` を実行すると、以下のタスクがタスクスケジューラに登録され、以降は自動起動する。`start_system.ps1`側の3タスクは実行するたびに内容を検証して上書き登録するため、スクリプトの内容が変わった場合も再実行するだけで既存サーバーのタスクが最新化される（`DisplayViewerAutoStart`は既に登録済みの場合はスキップ）。
+`start_system.ps1` / `start_view.ps1` を実行すると、以下のタスクがタスクスケジューラに登録され、以降は自動起動する。いずれも実行するたびに内容を検証して上書き登録するため、スクリプトの内容が変わった場合も再実行するだけで既存サーバー・STBのタスクが最新化される。
 
 | タスク名 | トリガー | 実行アカウント | 内容 |
 |---|---|---|---|
 | `MosquittoAutoStart` | システム起動時 | SYSTEM | Mosquitto を起動 |
 | `SignalLoggerAutoStart` | システム起動時 | SYSTEM | `signal_logger.py` を起動 |
 | `SrvDailyRestart` | 毎日 03:00 | SYSTEM | サーバーPCを再起動 |
-| `DisplayViewerAutoStart` | ログオン時 | 実行ユーザー | `view.py` を起動 |
+| `DisplayViewerAutoStart` | ログオン時（90秒遅延） | 実行ユーザー | `view.py` を起動（サーバー側MQTTブローカーの起動を確実に待つため90秒遅延） |
 
 停止する場合は `stop_system.ps1`（Mosquitto・`signal_logger.py`停止）、`stop_view.ps1`（`view.py`停止）を実行する。
 
