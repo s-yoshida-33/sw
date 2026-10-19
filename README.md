@@ -23,12 +23,15 @@ sw\
 │
 ├─ logs\                                            ← 各ログファイル保存
 │
+├─ state\                                           ← セレクター連動の切替前の入力番号（緊急表示中のみ存在）
+│
 ├─ server\
 │  ├─ signal_logger.py                              ← サーバー側 DI信号履歴ロガー
 │  └─ requirements.txt                              ← signal_logger.py 用ライブラリ
 │
 ├─ view\
 │  ├─ view.py                                       ← STB側 Tkinter画面制御
+│  ├─ selector.py                                   ← STB側 セレクター（IMAGENICS US-41系）のLAN制御
 │  └─ requirements.txt                              ← view.py 用ライブラリ
 │
 ├─ README.md                                        ← セットアップメモ
@@ -75,6 +78,18 @@ KC868-A16 の DI（デジタル入力）チャンネルの ON/OFF を MQTT 経�
 - OFFに戻ると、ミュート前の音量にデバイスごとに復元する
 - ON→ON（別chへの切り替え）では二重にミュート処理をせず、最初にミュートした際の音量のみを保存・復元に使う
 
+## セレクター連動仕様
+
+画像はSTBの画面にしか出ないため、STBの映像をセレクターで切り替えている現場では、セレクターが他の入力（CATV・外部入力等）を選んでいると画像が映らない。`config\config.txt` の `SELECTOR_HOST` を設定すると、ON の間はセレクターをこのSTBの入力へ強制的に切り替える。
+
+- 対象: IMAGENICS US-41 系（US-41RS / US-41ARS で確認）のLAN端子。TCP、ポート 1300（セレクター側の工場出荷値）
+- ON になると、切り替え前の入力番号を `state\selector_prev_input.txt` に保存し、`SELECTOR_INPUT` の入力へ切り替える。`SELECTOR_LOCK=1` のときは前面ボタンをキーロックする（緊急表示中に手で切り替えられないようにするため）
+- ON の間は `SELECTOR_REASSERT_SEC`（既定5秒）ごとに入力を確認し、ずれていれば切り替え直す（セレクターの電源再投入等への備え）
+- OFF になるとキーロックを解除し、保存した入力へ戻す。戻し終えるまで画像の表示と音声ミュートを続け、戻してから画像を消す（先に消すと、STBの映像・音声が一瞬セレクターから出るため。セレクターが応答しない場合も5秒で消す）。緊急表示中に view.py / STB が再起動しても、ファイルに保存した入力へ戻る
+- セレクターと通信できない場合はエラーをログに出し、5秒ごとに再試行する（画像表示・音声ミュートには影響しない）
+- 通信は専用スレッドで行い、コマンドごとに接続・切断する（セレクターはTCP接続中は1台からしか制御を受けないため）
+- 1台のセレクターを複数のSTBの `SELECTOR_HOST` に設定しないこと（取り合いになる）
+
 ## 自動起動・タスクスケジューラ仕様
 
 `start_system.ps1` / `start_view.ps1` を実行すると、以下のタスクがタスクスケジューラに登録され、以降は自動起動する。いずれも実行するたびに内容を検証して上書き登録するため、スクリプトの内容が変わった場合も再実行するだけで既存サーバー・STBのタスクが最新化される。
@@ -97,7 +112,7 @@ KC868-A16 の DI（デジタル入力）チャンネルの ON/OFF を MQTT 経�
 
 ## 設定ファイル仕様
 
-- `config\config.txt`：`MQTT_BROKER`, `MQTT_PORT`, `MQTT_TOPIC` を指定（`signal_logger.py`は`MQTT_PORT`, `MQTT_TOPIC`のみ使用し、ブローカーは常に自ホスト`127.0.0.1`に接続）
+- `config\config.txt`：`MQTT_BROKER`, `MQTT_PORT`, `MQTT_TOPIC` を指定。セレクター連動を使うSTBは `SELECTOR_HOST`（セレクターのIP）, `SELECTOR_PORT`, `SELECTOR_INPUT`（このSTBをつないでいる入力番号 1〜4）, `SELECTOR_LOCK`（1=緊急表示中に前面ボタンをロック）を指定（`signal_logger.py`は`MQTT_PORT`, `MQTT_TOPIC`のみ使用し、ブローカーは常に自ホスト`127.0.0.1`に接続）
 - `config\mosquitto.conf`：リスナーポート（既定 1883、全インターフェースで待受）、匿名接続許可、ログ出力先を指定
 
 # セットアップ
@@ -162,6 +177,12 @@ MQTT_TOPIC=kc868a16/di
 #sendaikamisugi
 MQTT_BROKER=192.168.11.106
 MQTT_TOPIC=kc868a16/di
+```
+
+セレクター連動を使うSTB（セレクターでSTBの映像を切り替えている現場）は、`SELECTOR_HOST` にセレクターのIP、`SELECTOR_INPUT` にこのSTBをつないでいる入力番号を設定する（詳細は「セレクター連動仕様」）
+```
+SELECTOR_HOST=192.168.120.2
+SELECTOR_INPUT=4
 ```
 
 3-6. Tkinter アプリ を起動

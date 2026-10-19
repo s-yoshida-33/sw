@@ -14,6 +14,7 @@ from pycaw.pycaw import AudioUtilities, EDataFlow, DEVICE_STATE
 import time
 import zipfile
 from datetime import datetime
+from selector import SelectorController
 
 # Logging
 LOG_DIR = Path("C:/sw/logs")
@@ -74,6 +75,15 @@ IMAGE_BASE_PATH = Path("C:/sw/images")
 MQTT_BROKER = "192.168.11.106"
 MQTT_PORT = 1883
 MQTT_TOPIC = "kc868a16/di"
+# Selector (IMAGENICS US-41 series) LAN control. Disabled when SELECTOR_HOST is empty.
+SELECTOR_HOST = ""
+SELECTOR_PORT = 1300
+SELECTOR_INPUT = 0
+SELECTOR_LOCK = True
+SELECTOR_REASSERT_SEC = 5.0
+# On OFF, the emergency image stays up until the selector is back on the original
+# input; if the selector does not answer, it is hidden after this anyway.
+SELECTOR_RESTORE_TIMEOUT_MS = 5000
 
 # Config file
 config_file = Path("C:/sw/config/config.txt")
@@ -91,6 +101,18 @@ if config_file.exists():
             if key == "MQTT_BROKER": MQTT_BROKER = value
             elif key == "MQTT_PORT": MQTT_PORT = int(value)
             elif key == "MQTT_TOPIC": MQTT_TOPIC = value
+            elif key == "SELECTOR_HOST": SELECTOR_HOST = value
+            elif key == "SELECTOR_PORT": SELECTOR_PORT = int(value)
+            elif key == "SELECTOR_INPUT": SELECTOR_INPUT = int(value)
+            elif key == "SELECTOR_LOCK": SELECTOR_LOCK = value.lower() in ("1", "true", "yes", "on")
+            elif key == "SELECTOR_REASSERT_SEC": SELECTOR_REASSERT_SEC = float(value)
+
+selector = None
+if SELECTOR_HOST:
+    if 1 <= SELECTOR_INPUT <= 4:
+        selector = SelectorController(SELECTOR_HOST, SELECTOR_PORT, SELECTOR_INPUT, SELECTOR_LOCK, SELECTOR_REASSERT_SEC)
+    else:
+        logging.error(f"Selector control disabled: SELECTOR_INPUT must be 1-4 (got {SELECTOR_INPUT})")
 
 # Tkinter init
 root = tk.Tk()
@@ -104,6 +126,7 @@ image_label.pack(fill=tk.BOTH, expand=True)
 
 # State
 current_signal_str = "OFF"
+off_seq = 0
 current_image = None
 saved_volumes = {}
 is_muted = False
@@ -198,18 +221,36 @@ def parse_di_index(payload):
         return None
     return int(m.group(1) or m.group(2))
 
+# Hide the emergency image and unmute. Ignored if the signal turned ON again, or if
+# this is the fallback timer of an earlier OFF (seq mismatch).
+def hide_emergency(seq=None):
+    if current_signal_str != "OFF" or (seq is not None and seq != off_seq):
+        return
+    root.withdraw()
+    set_mute(False)
+
 # Update display
 def update_display(payload):
-    global current_signal_str
+    global current_signal_str, off_seq
     payload = payload.strip()
     di_index = parse_di_index(payload)
+    # Called on every message (incl. the 1s heartbeat) so a saved input is restored
+    # even when view.py restarts after the emergency has ended.
+    if selector:
+        selector.request(di_index is not None)
     signal_str = "OFF" if di_index is None else f"ON [DI-{di_index}]"
     if signal_str != current_signal_str:
         logging.info(f"Signal changed: {current_signal_str} → {signal_str}")
         current_signal_str = signal_str
         if di_index is None:
-            root.withdraw()
-            set_mute(False)
+            off_seq += 1
+            if selector and selector.restore_pending():
+                # Keep the image and mute until the selector has switched back. Hiding
+                # first would briefly show (and sound) the STB's own content on the
+                # emergency input before the original input comes back.
+                root.after(SELECTOR_RESTORE_TIMEOUT_MS, hide_emergency, off_seq)
+            else:
+                hide_emergency()
         else:
             if load_image(di_index):
                 root.deiconify()
@@ -222,6 +263,8 @@ def update_display(payload):
 # Safe quit
 def safe_quit():
     try:
+        if selector:
+            selector.stop()
         mqtt_client.loop_stop()
         mqtt_client.disconnect()
         close_audio()
@@ -281,6 +324,9 @@ if __name__ == "__main__":
     cleanup_old_archives()
     init_audio()
     check_images()
+    if selector:
+        selector.on_restored = lambda: root.after(0, hide_emergency)
+        selector.start()
     connect_mqtt()
 
     try:
