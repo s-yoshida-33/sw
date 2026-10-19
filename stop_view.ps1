@@ -6,11 +6,12 @@ Write-Host "============================================================"
 Write-Host ""
 
 Write-Host "[INFO] Stopping view.py..."
-Get-CimInstance Win32_Process -Filter "Name='python.exe'" -ErrorAction SilentlyContinue |
+# pythonw.exe since view.py v2.4; python.exe is still matched for STBs launched before that.
+Get-CimInstance Win32_Process -Filter "Name='pythonw.exe' OR Name='python.exe'" -ErrorAction SilentlyContinue |
     Where-Object { $_.CommandLine -like "*view.py*" } |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 
-$remaining = Get-CimInstance Win32_Process -Filter "Name='python.exe'" -ErrorAction SilentlyContinue |
+$remaining = Get-CimInstance Win32_Process -Filter "Name='pythonw.exe' OR Name='python.exe'" -ErrorAction SilentlyContinue |
     Where-Object { $_.CommandLine -like "*view.py*" }
 if ($remaining) {
     Write-Host "[ERROR] Failed to stop view.py. Re-run this script as Administrator." -ForegroundColor Red

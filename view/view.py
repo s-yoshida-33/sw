@@ -1,10 +1,11 @@
-# view.py v2.3
+# view.py v2.4
 
 import tkinter as tk
 import paho.mqtt.client as mqtt
 from PIL import Image, ImageTk
 from pathlib import Path
 import logging
+import sys
 import re
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -23,9 +24,8 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.StreamHandler(),
         logging.FileHandler(LOG_FILE, encoding="utf-8")
-    ]
+    ] + ([logging.StreamHandler()] if sys.stderr else [])  # no stderr under pythonw.exe
 )
 
 # Log retention: the STB reboots daily (signage app's own 3AM task), so a

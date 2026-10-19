@@ -3,7 +3,12 @@ $ErrorActionPreference = "Stop"
 $host.UI.RawUI.WindowTitle = "Display Viewer"
 
 $SwRoot     = "C:\sw"
-$PythonPath = "C:\Users\$env:USERNAME\AppData\Local\Programs\Python\Python310\python.exe"
+# pythonw.exe (no console window). With python.exe the logon-triggered task opens
+# a normal-sized console window that shows up whenever the signage app's window is
+# closed or minimized (-WindowStyle Minimized below only applied to a manual launch,
+# and is ignored when Windows Terminal is the default terminal). view.py writes its
+# log to C:\sw\logs, so nothing is lost without a console.
+$PythonPath = "C:\Users\$env:USERNAME\AppData\Local\Programs\Python\Python310\pythonw.exe"
 $ViewPath   = Join-Path $SwRoot "view\view.py"
 $TaskName   = "DisplayViewerAutoStart"
 
@@ -24,4 +29,4 @@ $task.Author = "$env:USERDOMAIN\$env:USERNAME"
 Register-ScheduledTask -TaskName $TaskName -InputObject $task -Force | Out-Null
 
 Write-Host "[INFO] Starting View..."
-Start-Process -FilePath $PythonPath -ArgumentList "`"$ViewPath`"" -WindowStyle Minimized
+Start-Process -FilePath $PythonPath -ArgumentList "`"$ViewPath`""
