@@ -13,6 +13,8 @@ import pythoncom
 from pycaw.pycaw import AudioUtilities, EDataFlow, DEVICE_STATE
 import time
 import zipfile
+import ctypes
+from ctypes import wintypes
 from datetime import datetime
 from selector import SelectorController
 
@@ -187,6 +189,98 @@ def close_audio():
     except Exception as e:
         logging.error(f"Audio close error: {e}")
 
+# Keep the emergency window on top. Tk's "-topmost" alone is not enough: signage
+# apps that launch an external exe from their content (e.g. WonderScreenFactor's
+# ZipApp) force that exe's window to the foreground (AttachThreadInput / a simulated
+# Alt key press to get past Windows' foreground lock), and it then covers this
+# window. While the image is shown, re-raise it to the top of the topmost band and
+# take the foreground back whenever another window has it. The launcher only forces
+# the exe forward until it succeeds once, so this does not turn into a tug of war.
+KEEP_ON_TOP_INTERVAL_MS = 500
+
+_user32 = ctypes.WinDLL("user32", use_last_error=True)
+_kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+_user32.GetAncestor.argtypes = [wintypes.HWND, wintypes.UINT]
+_user32.GetAncestor.restype = wintypes.HWND
+_user32.GetForegroundWindow.argtypes = []
+_user32.GetForegroundWindow.restype = wintypes.HWND
+_user32.SetForegroundWindow.argtypes = [wintypes.HWND]
+_user32.SetForegroundWindow.restype = wintypes.BOOL
+_user32.BringWindowToTop.argtypes = [wintypes.HWND]
+_user32.BringWindowToTop.restype = wintypes.BOOL
+_user32.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int,
+                                 ctypes.c_int, ctypes.c_int, wintypes.UINT]
+_user32.SetWindowPos.restype = wintypes.BOOL
+_user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+_user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+_user32.AttachThreadInput.argtypes = [wintypes.DWORD, wintypes.DWORD, wintypes.BOOL]
+_user32.AttachThreadInput.restype = wintypes.BOOL
+_user32.keybd_event.argtypes = [wintypes.BYTE, wintypes.BYTE, wintypes.DWORD, ctypes.c_size_t]
+_user32.keybd_event.restype = None
+_kernel32.GetCurrentThreadId.argtypes = []
+_kernel32.GetCurrentThreadId.restype = wintypes.DWORD
+
+GA_ROOT = 2
+HWND_TOPMOST = wintypes.HWND(-1)
+SWP_NOSIZE = 0x0001
+SWP_NOMOVE = 0x0002
+SWP_NOACTIVATE = 0x0010
+VK_MENU = 0x12
+KEYEVENTF_KEYUP = 0x0002
+# Whether the window has held the foreground since it was last shown; only losing
+# it after that is logged (not the first raise on every ON).
+had_foreground = False
+
+def _window_hwnd():
+    # winfo_id() is Tk's inner child window; the z-order belongs to its top-level frame.
+    return _user32.GetAncestor(root.winfo_id(), GA_ROOT)
+
+def force_to_front():
+    global had_foreground
+    hwnd = _window_hwnd()
+    if not hwnd:
+        return
+    _user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
+    foreground = _user32.GetForegroundWindow()
+    if foreground == hwnd:
+        had_foreground = True
+        return
+    was_lost = had_foreground
+    # Windows refuses SetForegroundWindow from a process that is not in the foreground,
+    # so fall back to the same steps the launcher uses to push its exe forward.
+    _user32.SetForegroundWindow(hwnd)
+    if _user32.GetForegroundWindow() != hwnd and foreground:
+        current = _kernel32.GetCurrentThreadId()
+        other = _user32.GetWindowThreadProcessId(foreground, None)
+        if other and other != current and _user32.AttachThreadInput(current, other, True):
+            try:
+                _user32.BringWindowToTop(hwnd)
+                _user32.SetForegroundWindow(hwnd)
+            finally:
+                _user32.AttachThreadInput(current, other, False)
+    if _user32.GetForegroundWindow() != hwnd:
+        _user32.keybd_event(VK_MENU, 0, 0, 0)
+        _user32.keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0)
+        _user32.SetForegroundWindow(hwnd)
+    regained = _user32.GetForegroundWindow() == hwnd
+    if was_lost:
+        logging.info(f"Emergency window lost the foreground to pid {_foreground_pid(foreground)}; "
+                     + ("took it back" if regained else "could not take it back"))
+    had_foreground = regained
+
+def _foreground_pid(hwnd):
+    pid = wintypes.DWORD()
+    _user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+    return pid.value
+
+def keep_on_top():
+    try:
+        if root.state() != "withdrawn":
+            force_to_front()
+    except Exception as e:
+        logging.error(f"Keep-on-top error: {e}")
+    root.after(KEEP_ON_TOP_INTERVAL_MS, keep_on_top)
+
 # Load image
 def load_image(di_index):
     global current_image
@@ -229,9 +323,11 @@ def parse_di_index(payload):
 # Hide the emergency image and unmute. Ignored if the signal turned ON again, or if
 # this is the fallback timer of an earlier OFF (seq mismatch).
 def hide_emergency(seq=None):
+    global had_foreground
     if current_signal_str != "OFF" or (seq is not None and seq != off_seq):
         return
     root.withdraw()
+    had_foreground = False
     set_mute(False)
 
 # Update display
@@ -265,6 +361,9 @@ def update_display(payload):
                 set_mute(True)
             else:
                 root.deiconify()
+            # Take the foreground now rather than on the next keep_on_top tick.
+            root.update_idletasks()
+            force_to_front()
 
 # Safe quit
 def safe_quit():
@@ -337,6 +436,7 @@ if __name__ == "__main__":
             0, lambda: root.after(SELECTOR_RESTORE_DELAY_MS, hide_emergency, off_seq))
         selector.start()
     connect_mqtt()
+    keep_on_top()
 
     try:
         root.mainloop()
