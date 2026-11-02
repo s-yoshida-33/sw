@@ -85,7 +85,7 @@ KC868-A16 の DI（デジタル入力）チャンネルの ON/OFF を MQTT 経�
 - 対象: IMAGENICS US-41 系（US-41RS / US-41ARS で確認）のLAN端子。TCP、ポート 1300（セレクター側の工場出荷値）
 - ON になると、切り替え前の入力番号を `state\selector_prev_input.txt` に保存し、`SELECTOR_INPUT` の入力へ切り替える。`SELECTOR_LOCK=1` のときは前面ボタンをキーロックする（緊急表示中に手で切り替えられないようにするため）
 - ON の間は `SELECTOR_REASSERT_SEC`（既定5秒）ごとに入力を確認し、ずれていれば切り替え直す（セレクターの電源再投入等への備え）
-- OFF になるとキーロックを解除し、保存した入力へ戻す。戻し終えるまで画像の表示と音声ミュートを続け、戻してから画像を消す（先に消すと、STBの映像・音声が一瞬セレクターから出るため。セレクターが応答しない場合も5秒で消す）。緊急表示中に view.py / STB が再起動しても、ファイルに保存した入力へ戻る
+- OFF になるとキーロックを解除し、保存した入力へ戻す。戻し終えるまで画像の表示と音声ミュートを続け、戻したことを問い合わせで確認してから `SELECTOR_RESTORE_DELAY_MS`（既定4000ミリ秒）待って画像を消す（先に消すと、STBの映像・音声が一瞬セレクターから出るため。セレクターは実際の切替より先に新しい入力を返すので、確認後も待つ。セレクターが応答しない場合も、OFFから5秒＋`SELECTOR_RESTORE_DELAY_MS` で消す）。緊急表示中に view.py / STB が再起動しても、ファイルに保存した入力へ戻る
 - セレクターと通信できない場合はエラーをログに出し、5秒ごとに再試行する（画像表示・音声ミュートには影響しない）
 - 通信は専用スレッドで行い、コマンドごとに接続・切断する（セレクターはTCP接続中は1台からしか制御を受けないため）
 - 1台のセレクターを複数のSTBの `SELECTOR_HOST` に設定しないこと（取り合いになる）
@@ -112,7 +112,7 @@ KC868-A16 の DI（デジタル入力）チャンネルの ON/OFF を MQTT 経�
 
 ## 設定ファイル仕様
 
-- `config\config.txt`：`MQTT_BROKER`, `MQTT_PORT`, `MQTT_TOPIC` を指定。セレクター連動を使うSTBは `SELECTOR_HOST`（セレクターのIP）, `SELECTOR_PORT`, `SELECTOR_INPUT`（このSTBをつないでいる入力番号 1〜4）, `SELECTOR_LOCK`（1=緊急表示中に前面ボタンをロック）を指定（`signal_logger.py`は`MQTT_PORT`, `MQTT_TOPIC`のみ使用し、ブローカーは常に自ホスト`127.0.0.1`に接続）
+- `config\config.txt`：`MQTT_BROKER`, `MQTT_PORT`, `MQTT_TOPIC` を指定。セレクター連動を使うSTBは `SELECTOR_HOST`（セレクターのIP）, `SELECTOR_PORT`, `SELECTOR_INPUT`（このSTBをつないでいる入力番号 1〜4）, `SELECTOR_LOCK`（1=緊急表示中に前面ボタンをロック）を指定。必要なら `SELECTOR_RESTORE_DELAY_MS`（OFFで元の入力へ戻したことを確認してから画像を消すまでの待ち時間、既定4000）も指定できる（`signal_logger.py`は`MQTT_PORT`, `MQTT_TOPIC`のみ使用し、ブローカーは常に自ホスト`127.0.0.1`に接続）
 - `config\mosquitto.conf`：リスナーポート（既定 1883、全インターフェースで待受）、匿名接続許可、ログ出力先を指定
 
 # セットアップ

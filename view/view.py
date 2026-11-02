@@ -84,6 +84,10 @@ SELECTOR_REASSERT_SEC = 5.0
 # On OFF, the emergency image stays up until the selector is back on the original
 # input; if the selector does not answer, it is hidden after this anyway.
 SELECTOR_RESTORE_TIMEOUT_MS = 5000
+# The selector already reports the original input to "w" while its output is still
+# switching (about 2-3 s on site), so the image and mute are kept this much longer
+# after the restore is confirmed.
+SELECTOR_RESTORE_DELAY_MS = 4000
 
 # Config file
 config_file = Path("C:/sw/config/config.txt")
@@ -106,6 +110,7 @@ if config_file.exists():
             elif key == "SELECTOR_INPUT": SELECTOR_INPUT = int(value)
             elif key == "SELECTOR_LOCK": SELECTOR_LOCK = value.lower() in ("1", "true", "yes", "on")
             elif key == "SELECTOR_REASSERT_SEC": SELECTOR_REASSERT_SEC = float(value)
+            elif key == "SELECTOR_RESTORE_DELAY_MS": SELECTOR_RESTORE_DELAY_MS = int(value)
 
 selector = None
 if SELECTOR_HOST:
@@ -248,7 +253,8 @@ def update_display(payload):
                 # Keep the image and mute until the selector has switched back. Hiding
                 # first would briefly show (and sound) the STB's own content on the
                 # emergency input before the original input comes back.
-                root.after(SELECTOR_RESTORE_TIMEOUT_MS, hide_emergency, off_seq)
+                # The fallback includes the post-restore delay, or it would fire first.
+                root.after(SELECTOR_RESTORE_TIMEOUT_MS + SELECTOR_RESTORE_DELAY_MS, hide_emergency, off_seq)
             else:
                 hide_emergency()
         else:
@@ -325,7 +331,10 @@ if __name__ == "__main__":
     init_audio()
     check_images()
     if selector:
-        selector.on_restored = lambda: root.after(0, hide_emergency)
+        # Bind off_seq when the restore is confirmed (in the Tk thread), so a delayed hide
+        # from this OFF does not cut short a later ON -> OFF.
+        selector.on_restored = lambda: root.after(
+            0, lambda: root.after(SELECTOR_RESTORE_DELAY_MS, hide_emergency, off_seq))
         selector.start()
     connect_mqtt()
 
