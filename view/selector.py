@@ -150,6 +150,12 @@ class SelectorController:
             # 緊急表示中に（ロックなしの設定で）手動で別の入力に替えられていた場合は、その選択を尊重する
             if current == self.emergency_input and prev != current:
                 self.select_input(prev)
+                # 切替コマンドは戻り値がなく、落ちても分からない。ONのときと同様に問い合わせで確認し、
+                # 戻っていなければ保存ファイルを残したまま例外にして次の周期で再試行する
+                # （確認前にon_restoredを呼ぶと、セレクターが#4のままでも画像とミュートが解除される）
+                after = self.query_input()
+                if after != prev:
+                    raise OSError(f"restore to input {prev} not applied (now {after})")
                 logging.info(f"Selector: input {current} -> {prev} (restored)")
             try:
                 self.state_file.unlink()
