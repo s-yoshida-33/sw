@@ -4,6 +4,7 @@ $host.UI.RawUI.WindowTitle = "MQTT Server"
 
 $MosquittoPath = "C:\Program Files (x86)\mosquitto\mosquitto.exe"
 $MosquittoConf = "C:\sw\config\mosquitto.conf"
+$MosquittoLog  = "C:\sw\logs\mqtt.log"   # must match log_dest in mosquitto.conf
 $PythonPath    = "C:\Users\$env:USERNAME\AppData\Local\Programs\Python\Python310\python.exe"
 $SignalLogger  = "C:\sw\server\signal_logger.py"
 
@@ -58,8 +59,39 @@ Register-SwTask -Name "SignalLoggerAutoStart" `
     -Trigger (New-ScheduledTaskTrigger -AtStartup) `
     -Settings $AtStartupSettings
 
-# Start Mosquitto and the signal logger in background now (logs configured in mosquitto.conf / signal_logger.py)
-Write-Host "[INFO] Starting Mosquitto..."
-Start-Process -FilePath $MosquittoPath -ArgumentList "-c `"$MosquittoConf`""
+# --- Mosquitto log file permissions ---
+# Mosquitto creates its log file with an ACL for the creating account only (not
+# inherited from C:\sw\logs). When this script used to start Mosquitto as the
+# logged-on administrator, the log was created for that account only, and the
+# SYSTEM-run MosquittoAutoStart task after the next reboot could not write it:
+# Mosquitto keeps running silently and the log simply stops. Create the file if
+# needed and reset it to the folder's inherited ACL (SYSTEM, Administrators,
+# Users), which Mosquitto keeps when it opens an existing file.
+$MosquittoLogDir = Split-Path $MosquittoLog
+if (-not (Test-Path $MosquittoLogDir)) { New-Item -ItemType Directory -Path $MosquittoLogDir | Out-Null }
+if (-not (Test-Path $MosquittoLog)) { New-Item -ItemType File -Path $MosquittoLog | Out-Null }
+icacls $MosquittoLog /reset | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "[WARN] Could not reset permissions on $MosquittoLog (icacls exit code $LASTEXITCODE)"
+}
+
+# Start Mosquitto through its scheduled task, so it always runs as SYSTEM exactly as
+# it does after a reboot. A Mosquitto already running (e.g. from an earlier run of
+# this script) is stopped first: it holds port 1883, and it opened the log before
+# the permission fix above. Connected clients reconnect on their own.
+$running = Get-Process -Name "mosquitto" -ErrorAction SilentlyContinue
+if ($running) {
+    Write-Host "[INFO] Stopping running Mosquitto (PID $($running.Id -join ', '))..."
+    $running | Stop-Process -Force
+    $running | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue
+}
+Write-Host "[INFO] Starting Mosquitto (scheduled task 'MosquittoAutoStart')..."
+Start-ScheduledTask -TaskName "MosquittoAutoStart"
+Start-Sleep -Seconds 2
+if (-not (Get-Process -Name "mosquitto" -ErrorAction SilentlyContinue)) {
+    Write-Host "[WARN] Mosquitto is not running. Check $MosquittoConf and $MosquittoLog"
+}
+
+# Start the signal logger in background now (log configured in signal_logger.py)
 Write-Host "[INFO] Starting Signal Logger..."
 Start-Process -FilePath $PythonPath -ArgumentList "`"$SignalLogger`"" -WindowStyle Minimized

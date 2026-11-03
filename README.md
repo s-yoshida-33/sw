@@ -108,7 +108,7 @@ KC868-A16 の DI（デジタル入力）チャンネルの ON/OFF を MQTT 経�
 - `view.py`：`logs\view-<yyyy-mm-dd>.log` に日付ごとにINFO/ERRORレベルで出力（信号変化、MQTT接続状況、画像読み込み・音声制御のエラーなど）
   - `view.py` 起動時（STBは信号機アプリのタスクにより毎日AM3時に再起動）に、当月以外の日別ログを月単位（`logs\<yyyy-mm>.zip`）にまとめて元ファイルを削除し、作成から12か月を超えたzipを削除する
 - `signal_logger.py`：`logs\signal-<yyyy-mm-dd>.log` に日付ごとにINFO/ERRORレベルで出力（信号変化、MQTT接続状況など。STBに依存せずサーバー単体で信号履歴を確認できる。`view-*.log`と同様の月次zip化・12か月保持を行う）
-- Mosquitto：`logs\mqtt.log` にエラー、およびクライアントの接続・切断（`New client connected`/`Client <id> disconnected`など）を出力（`config\mosquitto.conf` の `log_type error` / `log_type notice` 設定による）
+- Mosquitto：`logs\mqtt.log` にエラー、およびクライアントの接続・切断（`New client connected`/`Client <id> disconnected`など）を出力（`config\mosquitto.conf` の `log_type error` / `log_type notice` 設定による）。Mosquittoは作成したアカウントだけが書き込める権限でログファイルを作るため、`start_system.ps1` は起動前に `mqtt.log` の権限をフォルダと同じ設定に戻し、Mosquittoは手動実行時も常にタスク `MosquittoAutoStart`（SYSTEM）から起動する（管理者が手動で起動して作ったログには、再起動後のSYSTEMのMosquittoが書き込めず、ログが黙って止まるため）
 
 ## 設定ファイル仕様
 
